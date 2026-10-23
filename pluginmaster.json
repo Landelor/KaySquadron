@@ -1,0 +1,34 @@
+[
+    {
+        "Author": "Landelor",
+        "Name": "KaySquadron",
+        "InternalName": "KaySquadron",
+        "AssemblyVersion": "1.1.0.0",
+        "Description": "Grand Company (GC) Squadron Optimizer. Calculates attributes, success chances, and training recommendations for your barracks.",
+        "ApplicableRegions": [
+            "CN",
+            "KR",
+            "Global"
+        ],
+        "Tags": [
+            "squadron",
+            "utility",
+            "optimization"
+        ],
+        "DalamudApiLevel": 15,
+        "LoadRequiredState": 0,
+        "LoadSync": false,
+        "CanUnloadAsync": false,
+        "SupportsConfig": true,
+        "RepoUrl": "https://github.com/Landelor/KaySquadron",
+        "IconUrl": "https://raw.githubusercontent.com/Landelor/KaySquadron/main/KaySquadron/images/icon.png?v=1",
+        "ImageUrls": [
+            "https://raw.githubusercontent.com/Landelor/KaySquadron/main/KaySquadron/images/icon.png?v=1"
+        ],
+        "Punchline": "Turn your recruits into an elite unit.",
+        "DownloadLinkInstall": "https://github.com/Landelor/KaySquadron/releases/latest/download/KaySquadron.zip",
+        "DownloadLinkUpdate": "https://github.com/Landelor/KaySquadron/releases/latest/download/KaySquadron.zip",
+        "DownloadLinkTesting": "https://github.com/Landelor/KaySquadron/releases/latest/download/KaySquadron.zip",
+        "LastUpdate": "1792732151"
+    }
+]

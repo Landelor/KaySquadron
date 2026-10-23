@@ -7,23 +7,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Runtime.InteropServices;
-using FFXIVClientStructs.FFXIV.Client.UI.Agent;
-using FFXIVClientStructs.FFXIV.Component.GUI;
 using FFXIVClientStructs.FFXIV.Client.Game;
-using FFXIVClientStructs.FFXIV.Client.Game.UI;
 
 namespace KaySquadron
 {
-    // Keeping this layout just in case, but will try to use library types
-    [StructLayout(LayoutKind.Explicit, Size = 0x48)]
-    public unsafe struct GCSquadronMemberStruct
-    {
-        [FieldOffset(0x00)] public fixed byte Name[32];
-        [FieldOffset(0x28)] public int Level;
-        [FieldOffset(0x2C)] public byte ClassId;
-    }
-
     public class KaySquadronWindow : Window
     {
         private List<SquadronMission> _missions;
@@ -51,10 +38,10 @@ namespace KaySquadron
             {
                 _members.Add(new SquadronMember 
                 { 
-                    Name = $"Recrue {i+1}", 
+                    Name = Loc.T("RecruitPlaceholder", i + 1), 
                     Level = 50, 
                     ClassId = (int)SquadronData.SquadronClass.Marauder,
-                    ClassName = "Maraudeur",
+                    ClassName = SquadronData.SquadronClass.Marauder.ToString(),
                     BaseAttributes = SquadronData.GetBaseStats(SquadronData.SquadronClass.Marauder, 50)
                 });
             }
@@ -130,9 +117,9 @@ namespace KaySquadron
 
         private void DrawOptimizationTab()
         {
-            ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), "Sélectionnez votre mission cible et le calculateur trouvera");
-            ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), "exactement comment répartir l'entraînement pour 100% de réussite.");
-            ImGui.TextColored(new Vector4(0.5f, 0.8f, 0.5f, 1f), $"Entraînement actuel : 💪 {_currentTraining.Physical}  🧠 {_currentTraining.Mental}  🎯 {_currentTraining.Tactical}");
+            ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), Loc.T("OptimizationIntro1"));
+            ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), Loc.T("OptimizationIntro2"));
+            ImGui.TextColored(new Vector4(0.5f, 0.8f, 0.5f, 1f), Loc.T("CurrentTrainingStatus", $"💪 {_currentTraining.Physical}", $"🧠 {_currentTraining.Mental}", $"🎯 {_currentTraining.Tactical}"));
             ImGui.Spacing();
             
             ImGui.TextColored(new Vector4(0.01f, 0.95f, 1f, 1f), Loc.T("SelectMission"));
@@ -283,14 +270,14 @@ namespace KaySquadron
 
         private unsafe void ImportFromGame()
         {
-            AddDebug("Début de l'auto-importation via GcArmyManager...");
+            AddDebug(Loc.T("ImportStart"));
             
             try 
             {
                 var manager = FFXIVClientStructs.FFXIV.Client.Game.GcArmyManager.Instance();
                 if (manager == null || manager->Data == null)
                 {
-                    AddDebug("Erreur : GcArmyManager ou Data est null. (Êtes-vous dans la caserne ?)");
+                    AddDebug(Loc.T("ImportErrNullManager"));
                     return;
                 }
                 
@@ -302,7 +289,7 @@ namespace KaySquadron
                     manager->Data->BonusMental,
                     manager->Data->BonusTactical
                 );
-                AddDebug($"Entraînement lu : {_currentTraining.Physical}/{_currentTraining.Mental}/{_currentTraining.Tactical}");
+                AddDebug(Loc.T("ImportTrainingRead", _currentTraining.Physical, _currentTraining.Mental, _currentTraining.Tactical));
 
                 // Sheets for real names
                 var gcSheet = Plugin.Data.GetExcelSheet<Lumina.Excel.Sheets.GcArmyMember>();
@@ -321,7 +308,7 @@ namespace KaySquadron
                     
                     if (baseId == 0) continue; // Empty slot
                     
-                    string name = $"Recrue {i+1}";
+                    string name = Loc.T("RecruitPlaceholder", i + 1);
                     try 
                     {
                         if (gcSheet != null && enpcSheet != null) 
@@ -375,69 +362,13 @@ namespace KaySquadron
                         BaseAttributes = SquadronData.GetBaseStats(job, level)
                     });
                     
-                    AddDebug($"Importé: {name} (Niv {level}, {job.ToString()})");
+                    AddDebug(Loc.T("ImportMemberLine", name, level, job.ToString()));
                 }
-                AddDebug($"Import terminé. {_members.Count} recrues trouvées !");
+                AddDebug(Loc.T("ImportComplete", _members.Count));
             }
             catch (Exception ex)
             {
-                AddDebug($"Erreur GcArmyManager : {ex.Message}");
-            }
-        }
-
-        private unsafe void ImportFromAgent()
-        {
-            var agent = (byte*)FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentModule.Instance()->GetAgentByInternalId((AgentId)165);
-            if (agent == null)
-            {
-                AddDebug("Erreur : Impossible de trouver l'Agent 165.");
-                return;
-            }
-            AddDebug($"Agent 165 trouvé à : 0x{(nint)agent:X}");
-
-            int memberCount = *(int*)(agent + 0x20);
-            AddDebug($"Agent 165 MemberCount à 0x20 : {memberCount}");
-
-            if (memberCount <= 0 || memberCount > 8)
-            {
-                memberCount = *(int*)(agent + 0x18);
-                AddDebug($"Agent 165 MemberCount à 0x18 : {memberCount}");
-            }
-
-            if (memberCount <= 0 || memberCount > 8)
-            {
-                AddDebug("Erreur : Nombre de membres invalide dans l'agent.");
-                return;
-            }
-
-            var membersPtr = *(GCSquadronMemberStruct**)(agent + 0x28);
-            if (membersPtr == null)
-            {
-                membersPtr = *(GCSquadronMemberStruct**)(agent + 0x20);
-                AddDebug("Utilisation du pointeur à 0x20");
-            }
-            
-            if (membersPtr == null)
-            {
-                AddDebug("Erreur : Pointeur de tableau de membres nul.");
-                return;
-            }
-
-            _members.Clear();
-            for (int i = 0; i < memberCount; i++)
-            {
-                var m = membersPtr[i];
-                string name = Marshal.PtrToStringUTF8((IntPtr)m.Name) ?? $"Recrue {i + 1}";
-                var job = (SquadronData.SquadronClass)m.ClassId;
-                _members.Add(new SquadronMember
-                {
-                    Name = name,
-                    Level = m.Level,
-                    ClassId = m.ClassId,
-                    ClassName = job.ToString(),
-                    BaseAttributes = SquadronData.GetBaseStats(job, m.Level)
-                });
-                AddDebug($"Membre {i} via Agent : {name}");
+                AddDebug(Loc.T("ImportErrGeneric", ex.Message));
             }
         }
 

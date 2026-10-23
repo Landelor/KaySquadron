@@ -48,7 +48,21 @@ namespace KaySquadron
             { "ErrNoMembers", "Error: No members imported." },
             { "ErrPointer", "Error: Memory pointer not found." },
             { "ErrLuminaLoad", "Error loading missions: {0}" },
-            { "MissionNameFallback", "Lumina load error" }
+            { "MissionNameFallback", "Lumina load error" },
+
+            // Optimization tab intro / status
+            { "OptimizationIntro1", "Select your target mission and the calculator will find" },
+            { "OptimizationIntro2", "exactly how to split training for a 100% success rate." },
+            { "CurrentTrainingStatus", "Current training: {0}  {1}  {2}" },
+
+            // Import debug messages
+            { "ImportStart", "Starting auto-import via GcArmyManager..." },
+            { "ImportErrNullManager", "Error: GcArmyManager or Data is null. (Are you in the barracks?)" },
+            { "ImportTrainingRead", "Training read: {0}/{1}/{2}" },
+            { "ImportMemberLine", "Imported: {0} (Lvl {1}, {2})" },
+            { "ImportComplete", "Import complete. {0} recruits found!" },
+            { "ImportErrGeneric", "GcArmyManager error: {0}" },
+            { "RecruitPlaceholder", "Recruit {0}" }
         };
 
         private static readonly Dictionary<string, string> FrenchStrings = new()
@@ -87,7 +101,21 @@ namespace KaySquadron
             { "ErrNoMembers", "Erreur : aucun membre importé." },
             { "ErrPointer", "Erreur : Pointeur mémoire introuvable." },
             { "ErrLuminaLoad", "Erreur lors du chargement des missions : {0}" },
-            { "MissionNameFallback", "Erreur de chargement de Lumina" }
+            { "MissionNameFallback", "Erreur de chargement de Lumina" },
+
+            // Optimization tab intro / status
+            { "OptimizationIntro1", "Sélectionnez votre mission cible et le calculateur trouvera" },
+            { "OptimizationIntro2", "exactement comment répartir l'entraînement pour 100% de réussite." },
+            { "CurrentTrainingStatus", "Entraînement actuel : {0}  {1}  {2}" },
+
+            // Import debug messages
+            { "ImportStart", "Début de l'auto-importation via GcArmyManager..." },
+            { "ImportErrNullManager", "Erreur : GcArmyManager ou Data est null. (Êtes-vous dans la caserne ?)" },
+            { "ImportTrainingRead", "Entraînement lu : {0}/{1}/{2}" },
+            { "ImportMemberLine", "Importé : {0} (Niv {1}, {2})" },
+            { "ImportComplete", "Import terminé. {0} recrues trouvées !" },
+            { "ImportErrGeneric", "Erreur GcArmyManager : {0}" },
+            { "RecruitPlaceholder", "Recrue {0}" }
         };
 
         public static string T(string key)

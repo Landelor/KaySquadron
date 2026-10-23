@@ -20,9 +20,9 @@ namespace KaySquadron
         public string Name => "KaySquadron";
         private const string CommandName = "/ksquad";
 
-        public Configuration Configuration { get; init; }
-        public WindowSystem WindowSystem { get; init; }
-        public KaySquadronWindow MainWindow { get; init; }
+        public Configuration Configuration { get; init; } = null!;
+        public WindowSystem WindowSystem { get; init; } = null!;
+        public KaySquadronWindow MainWindow { get; init; } = null!;
 
         public Plugin()
         {
