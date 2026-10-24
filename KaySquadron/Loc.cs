@@ -30,7 +30,7 @@ namespace KaySquadron
             { "StatsNotMet", "No configuration found that meets 100% of the mission requirements." },
             { "BestMatches", "Best recommendations:" },
             { "SuccessRatio", "Success: {0}/3 - [{1}]" },
-            { "BoardTrainingLabel", "Board Training (400 pts):" },
+            { "BoardTrainingLabel", "Board Training ({0} pts):" },
             { "Physical", "Physical" },
             { "Mental", "Mental" },
             { "Tactical", "Tactical" },
@@ -63,7 +63,11 @@ namespace KaySquadron
             { "ImportComplete", "Import complete. {0} recruits found!" },
             { "ImportErrGeneric", "GcArmyManager error: {0}" },
             { "RecruitPlaceholder", "Recruit {0}" },
-            { "AutoOpenToggle", "Auto-open with the Squadron Missions window" }
+            { "AutoOpenToggle", "Auto-open with the Squadron Missions window" },
+            { "SquadronRankLabel", "Squadron Rank (training point pool)" },
+            { "RankOption1", "Rank 1 - Trainee (200 pts)" },
+            { "RankOption2", "Rank 2 (300 pts)" },
+            { "RankOption3", "Rank 3 - Max (400 pts)" }
         };
 
         private static readonly Dictionary<string, string> FrenchStrings = new()
@@ -84,7 +88,7 @@ namespace KaySquadron
             { "StatsNotMet", "Aucune configuration ne permet d'atteindre 100% des prérequis pour cette mission." },
             { "BestMatches", "Meilleures recommandations :" },
             { "SuccessRatio", "Succès : {0}/3 - [{1}]" },
-            { "BoardTrainingLabel", "Entraînement au tableau (400 pts) :" },
+            { "BoardTrainingLabel", "Entraînement au tableau ({0} pts) :" },
             { "Physical", "Physique" },
             { "Mental", "Mental" },
             { "Tactical", "Tactique" },
@@ -117,7 +121,11 @@ namespace KaySquadron
             { "ImportComplete", "Import terminé. {0} recrues trouvées !" },
             { "ImportErrGeneric", "Erreur GcArmyManager : {0}" },
             { "RecruitPlaceholder", "Recrue {0}" },
-            { "AutoOpenToggle", "Ouvrir automatiquement avec la fenêtre des Missions d'Escouade" }
+            { "AutoOpenToggle", "Ouvrir automatiquement avec la fenêtre des Missions d'Escouade" },
+            { "SquadronRankLabel", "Rang de l'escouade (réserve de points d'entraînement)" },
+            { "RankOption1", "Rang 1 - Recrue (200 pts)" },
+            { "RankOption2", "Rang 2 (300 pts)" },
+            { "RankOption3", "Rang 3 - Max (400 pts)" }
         };
 
         public static string T(string key)

@@ -35,6 +35,17 @@ namespace KaySquadron
             };
         }
 
+        /// <summary>
+        /// Total board-training points available at a given Squadron Rank.
+        /// Rank 1 (Trainee, starting rank) = 200, Rank 2 = 300, Rank 3 (max) = 400.
+        /// </summary>
+        public static int GetMaxTrainingPoints(int squadronRank) => squadronRank switch
+        {
+            1 => 200,
+            2 => 300,
+            _ => 400,
+        };
+
         public static List<SquadronMission> GetMissions()
         {
             var list = new List<SquadronMission>();

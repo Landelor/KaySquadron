@@ -143,9 +143,31 @@ namespace KaySquadron
             ImGui.Separator();
             ImGui.Spacing();
 
+            ImGui.TextColored(new Vector4(0.01f, 0.95f, 1f, 1f), Loc.T("SquadronRankLabel"));
+            int squadronRank = _configuration.SquadronRank;
+            ImGui.SetNextItemWidth(-1);
+            if (ImGui.BeginCombo("##SquadronRankCombo", Loc.T($"RankOption{squadronRank}")))
+            {
+                for (int rank = 1; rank <= 3; rank++)
+                {
+                    if (ImGui.Selectable(Loc.T($"RankOption{rank}"), squadronRank == rank))
+                    {
+                        _configuration.SquadronRank = rank;
+                        _configuration.Save();
+                    }
+                }
+                ImGui.EndCombo();
+            }
+
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+
+            int maxTrainingPoints = SquadronData.GetMaxTrainingPoints(_configuration.SquadronRank);
+
             if (ImGui.Button(Loc.T("OptimizeBtn"), new Vector2(ImGui.GetContentRegionAvail().X / 2 - 4, 40)) && _selectedMission != null)
             {
-                _results = _optimizer.Optimize(_members, _selectedMission);
+                _results = _optimizer.Optimize(_members, _selectedMission, maxTrainingPoints);
             }
             ImGui.SameLine();
             if (ImGui.Button(Loc.T("ResetBtn"), new Vector2(ImGui.GetContentRegionAvail().X, 40)))
@@ -172,7 +194,7 @@ namespace KaySquadron
                     {
                         ImGui.Indent();
                         
-                        ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), Loc.T("BoardTrainingLabel"));
+                        ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), Loc.T("BoardTrainingLabel", maxTrainingPoints));
                         ImGui.TextColored(new Vector4(1f, 1f, 1f, 1f), $" 💪 {Loc.T("Physical")} : {res.BestTraining.Physical}");
                         ImGui.SameLine(150);
                         ImGui.TextColored(new Vector4(1f, 1f, 1f, 1f), $" 🧠 {Loc.T("Mental")} : {res.BestTraining.Mental}");

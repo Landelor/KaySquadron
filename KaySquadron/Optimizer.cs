@@ -14,30 +14,41 @@ namespace KaySquadron
 
     public class Optimizer
     {
-        private static List<Attributes> _possibleTrainingDistributions = null!;
+        private const int TrainingStep = 20;
 
-        static Optimizer()
-        {
-            InitializeTrainingDistributions();
-        }
+        // Cached per total-points pool (200/300/400) so repeated Optimize() calls at the
+        // same Squadron Rank don't regenerate the same distribution list every time.
+        private static readonly Dictionary<int, List<Attributes>> _distributionCache = new();
 
-        private static void InitializeTrainingDistributions()
+        private static List<Attributes> GetTrainingDistributions(int totalPoints)
         {
-            _possibleTrainingDistributions = new List<Attributes>();
-            // 400 total points, steps of 20
-            for (int p = 0; p <= 400; p += 20)
+            if (_distributionCache.TryGetValue(totalPoints, out var cached))
             {
-                for (int m = 0; m <= 400 - p; m += 20)
+                return cached;
+            }
+
+            var distributions = new List<Attributes>();
+            for (int p = 0; p <= totalPoints; p += TrainingStep)
+            {
+                for (int m = 0; m <= totalPoints - p; m += TrainingStep)
                 {
-                    int t = 400 - p - m;
-                    _possibleTrainingDistributions.Add(new Attributes(p, m, t));
+                    int t = totalPoints - p - m;
+                    distributions.Add(new Attributes(p, m, t));
                 }
             }
+
+            _distributionCache[totalPoints] = distributions;
+            return distributions;
         }
 
-        public List<OptimizationResult> Optimize(List<SquadronMember> allMembers, SquadronMission mission)
+        /// <param name="maxTrainingPoints">
+        /// Total board-training points available at the squadron's current Rank
+        /// (200 at Rank 1, 300 at Rank 2, 400 at Rank 3). See SquadronData.GetMaxTrainingPoints.
+        /// </param>
+        public List<OptimizationResult> Optimize(List<SquadronMember> allMembers, SquadronMission mission, int maxTrainingPoints)
         {
             var results = new List<OptimizationResult>();
+            var trainingDistributions = GetTrainingDistributions(maxTrainingPoints);
 
             // Combinations of 4 members from 8
             var combinations = GetCombinations(allMembers, 4);
@@ -52,7 +63,7 @@ namespace KaySquadron
 
                 OptimizationResult? bestForThisTeam = null;
 
-                foreach (var training in _possibleTrainingDistributions)
+                foreach (var training in trainingDistributions)
                 {
                     var finalStats = baseStats + training;
                     int met = finalStats.RequirementsMetCount(mission.RequiredAttributes);
