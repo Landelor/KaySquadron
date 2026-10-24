@@ -15,6 +15,7 @@ namespace KaySquadron
     {
         private List<SquadronMission> _missions;
         private List<SquadronMember> _members;
+        private List<TrainingCourse> _trainingCourses;
         private SquadronMission? _selectedMission;
         private List<OptimizationResult> _results = new();
         private Optimizer _optimizer = new();
@@ -33,6 +34,7 @@ namespace KaySquadron
             SizeCondition = ImGuiCond.FirstUseEver;
             
             _missions = SquadronData.GetMissions();
+            _trainingCourses = SquadronData.GetTrainingCourses();
             _members = new List<SquadronMember>();
             
             // Default members for testing
@@ -167,7 +169,7 @@ namespace KaySquadron
 
             if (ImGui.Button(Loc.T("OptimizeBtn"), new Vector2(ImGui.GetContentRegionAvail().X / 2 - 4, 40)) && _selectedMission != null)
             {
-                _results = _optimizer.Optimize(_members, _selectedMission, maxTrainingPoints);
+                _results = _optimizer.Optimize(_members, _selectedMission, maxTrainingPoints, _currentTraining, _trainingCourses);
             }
             ImGui.SameLine();
             if (ImGui.Button(Loc.T("ResetBtn"), new Vector2(ImGui.GetContentRegionAvail().X, 40)))
@@ -193,13 +195,30 @@ namespace KaySquadron
                     if (expanded)
                     {
                         ImGui.Indent();
-                        
+
                         ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), Loc.T("BoardTrainingLabel", maxTrainingPoints));
                         ImGui.TextColored(new Vector4(1f, 1f, 1f, 1f), $" 💪 {Loc.T("Physical")} : {res.BestTraining.Physical}");
                         ImGui.SameLine(150);
                         ImGui.TextColored(new Vector4(1f, 1f, 1f, 1f), $" 🧠 {Loc.T("Mental")} : {res.BestTraining.Mental}");
                         ImGui.SameLine(300);
                         ImGui.TextColored(new Vector4(1f, 1f, 1f, 1f), $" 🎯 {Loc.T("Tactical")} : {res.BestTraining.Tactical}");
+
+                        ImGui.Spacing();
+
+                        if (res.TrainingPlan.Count > 0)
+                        {
+                            ImGui.TextColored(new Vector4(0.01f, 0.95f, 1f, 1f), Loc.T("TrainingPlanLabel", res.SessionsNeeded));
+                            foreach (var rec in res.TrainingPlan)
+                            {
+                                ImGui.BulletText($"{rec.Course.Name}  x{rec.Count}  ({DescribeCourseBonus(rec.Course)})");
+                            }
+                            int days = (int)Math.Ceiling(res.SessionsNeeded / 3.0);
+                            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), Loc.T("TrainingPlanDays", days));
+                        }
+                        else
+                        {
+                            ImGui.TextColored(new Vector4(0.4f, 1f, 0.4f, 1f), Loc.T("TrainingPlanNone"));
+                        }
 
                         ImGui.Spacing();
                         
@@ -215,6 +234,15 @@ namespace KaySquadron
                     }
                 }
             }
+        }
+
+        private static string DescribeCourseBonus(TrainingCourse course)
+        {
+            var parts = new List<string>();
+            if (course.Bonus.Physical > 0) parts.Add($"+{course.Bonus.Physical} {Loc.T("Physical")}");
+            if (course.Bonus.Mental > 0) parts.Add($"+{course.Bonus.Mental} {Loc.T("Mental")}");
+            if (course.Bonus.Tactical > 0) parts.Add($"+{course.Bonus.Tactical} {Loc.T("Tactical")}");
+            return string.Join(", ", parts);
         }
 
         private void DrawStatComparison(string label, int actual, int required, Vector4 color)

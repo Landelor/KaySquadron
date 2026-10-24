@@ -18,6 +18,9 @@ namespace KaySquadron
         public static Attributes operator +(Attributes a, Attributes b) 
             => new Attributes(a.Physical + b.Physical, a.Mental + b.Mental, a.Tactical + b.Tactical);
 
+        public static Attributes operator -(Attributes a, Attributes b) 
+            => new Attributes(a.Physical - b.Physical, a.Mental - b.Mental, a.Tactical - b.Tactical);
+
         public int Total => Physical + Mental + Tactical;
 
         public bool Meets(Attributes requirement) 
@@ -52,5 +55,29 @@ namespace KaySquadron
         public Attributes RequiredAttributes { get; set; }
         public bool IsFlagged { get; set; }
         public bool IsPriority { get; set; }
+    }
+
+    /// <summary>
+    /// A single Regimen Board training course (GcArmyTraining sheet row). Each course adds a
+    /// FIXED bonus when run (+40 to one stat, or +20/+20 to two) - training is not a freely
+    /// distributable pool, it's picking one of these per session (up to 3 sessions/day).
+    /// </summary>
+    public readonly struct TrainingCourse
+    {
+        public string Name { get; }
+        public Attributes Bonus { get; }
+
+        public TrainingCourse(string name, Attributes bonus)
+        {
+            Name = name;
+            Bonus = bonus;
+        }
+    }
+
+    /// <summary>How many times a given training course should be run to reach a target.</summary>
+    public class CourseRecommendation
+    {
+        public TrainingCourse Course { get; set; }
+        public int Count { get; set; }
     }
 }

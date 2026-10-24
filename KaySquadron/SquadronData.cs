@@ -46,6 +46,52 @@ namespace KaySquadron
             _ => 400,
         };
 
+        /// <summary>
+        /// The Regimen Board's 6 stat-affecting training courses (GcArmyTraining sheet rows
+        /// 1-6), read live so names match the game's display language. Row 0 is empty and
+        /// row 7 ("Comprehensive Training Course") grants 3000 XP but no stat change, so both
+        /// are excluded here since they're irrelevant to stat-optimization math.
+        /// </summary>
+        public static List<TrainingCourse> GetTrainingCourses()
+        {
+            var list = new List<TrainingCourse>();
+
+            try
+            {
+                var sheet = Plugin.Data.GetExcelSheet<Lumina.Excel.Sheets.GcArmyTraining>();
+                if (sheet != null)
+                {
+                    foreach (var row in sheet)
+                    {
+                        if (row.RowId == 0) continue; // empty placeholder row
+                        if (row.PhysicalBonus == 0 && row.MentalBonus == 0 && row.TacticalBonus == 0) continue; // Comprehensive Training Course
+
+                        string name = row.Name.ToString();
+                        if (string.IsNullOrEmpty(name)) continue;
+
+                        list.Add(new TrainingCourse(name, new Attributes(row.PhysicalBonus, row.MentalBonus, row.TacticalBonus)));
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Plugin.Log.Error(Loc.T("ErrLuminaLoad", ex.Message));
+            }
+
+            // Fallback if the sheet fails to load - values confirmed against GcArmyTraining.
+            if (list.Count == 0)
+            {
+                list.Add(new TrainingCourse("Basic Training: Physical", new Attributes(40, 0, 0)));
+                list.Add(new TrainingCourse("Basic Training: Mental", new Attributes(0, 40, 0)));
+                list.Add(new TrainingCourse("Basic Training: Tactical", new Attributes(0, 0, 40)));
+                list.Add(new TrainingCourse("Advanced Training: Physical & Mental", new Attributes(20, 20, 0)));
+                list.Add(new TrainingCourse("Advanced Training: Physical & Tactical", new Attributes(20, 0, 20)));
+                list.Add(new TrainingCourse("Advanced Training: Mental & Tactical", new Attributes(0, 20, 20)));
+            }
+
+            return list;
+        }
+
         public static List<SquadronMission> GetMissions()
         {
             var list = new List<SquadronMission>();
