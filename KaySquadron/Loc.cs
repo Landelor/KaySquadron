@@ -62,7 +62,8 @@ namespace KaySquadron
             { "ImportMemberLine", "Imported: {0} (Lvl {1}, {2})" },
             { "ImportComplete", "Import complete. {0} recruits found!" },
             { "ImportErrGeneric", "GcArmyManager error: {0}" },
-            { "RecruitPlaceholder", "Recruit {0}" }
+            { "RecruitPlaceholder", "Recruit {0}" },
+            { "AutoOpenToggle", "Auto-open with the Squadron Missions window" }
         };
 
         private static readonly Dictionary<string, string> FrenchStrings = new()
@@ -115,7 +116,8 @@ namespace KaySquadron
             { "ImportMemberLine", "Importé : {0} (Niv {1}, {2})" },
             { "ImportComplete", "Import terminé. {0} recrues trouvées !" },
             { "ImportErrGeneric", "Erreur GcArmyManager : {0}" },
-            { "RecruitPlaceholder", "Recrue {0}" }
+            { "RecruitPlaceholder", "Recrue {0}" },
+            { "AutoOpenToggle", "Ouvrir automatiquement avec la fenêtre des Missions d'Escouade" }
         };
 
         public static string T(string key)

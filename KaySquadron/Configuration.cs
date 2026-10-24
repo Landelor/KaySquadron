@@ -11,6 +11,7 @@ namespace KaySquadron
 
         // Add config fields here
         public bool ShowSuccessProbability { get; set; } = true;
+        public bool AutoOpenWithSquadronWindow { get; set; } = true;
 
         [NonSerialized]
         private IDalamudPluginInterface? _pluginInterface;

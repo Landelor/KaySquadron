@@ -19,14 +19,16 @@ namespace KaySquadron
         private List<OptimizationResult> _results = new();
         private Optimizer _optimizer = new();
         private Attributes _currentTraining = new(0, 0, 0);
+        private readonly Configuration _configuration;
 
         private void AddDebug(string msg)
         {
             Plugin.Log.Info(msg);
         }
 
-        public KaySquadronWindow() : base(Loc.T("PluginName"))
+        public KaySquadronWindow(Configuration configuration) : base(Loc.T("PluginName"))
         {
+            _configuration = configuration;
             Size = new Vector2(600, 600);
             SizeCondition = ImGuiCond.FirstUseEver;
             
@@ -207,6 +209,15 @@ namespace KaySquadron
 
         private void DrawMembersTab()
         {
+            ImGui.Spacing();
+
+            bool autoOpen = _configuration.AutoOpenWithSquadronWindow;
+            if (ImGui.Checkbox(Loc.T("AutoOpenToggle"), ref autoOpen))
+            {
+                _configuration.AutoOpenWithSquadronWindow = autoOpen;
+                _configuration.Save();
+            }
+
             ImGui.Spacing();
             
             // Primary Action Button styling
