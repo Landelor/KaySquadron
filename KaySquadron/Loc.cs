@@ -70,7 +70,8 @@ namespace KaySquadron
             { "RankOption3", "Rank 3 - Max (400 pts)" },
             { "TrainingPlanLabel", "Recommended training plan ({0} sessions):" },
             { "TrainingPlanDays", "~{0} day(s) at 3 sessions/day" },
-            { "TrainingPlanNone", "Already there - no further training needed!" }
+            { "TrainingPlanNone", "Already there - no further training needed!" },
+            { "MissionNamePrefix", "[Lvl. {0}] {1}" }
         };
 
         private static readonly Dictionary<string, string> FrenchStrings = new()
@@ -131,7 +132,8 @@ namespace KaySquadron
             { "RankOption3", "Rang 3 - Max (400 pts)" },
             { "TrainingPlanLabel", "Plan d'entraînement recommandé ({0} séances) :" },
             { "TrainingPlanDays", "~{0} jour(s) à 3 séances/jour" },
-            { "TrainingPlanNone", "Déjà atteint - aucun entraînement supplémentaire requis !" }
+            { "TrainingPlanNone", "Déjà atteint - aucun entraînement supplémentaire requis !" },
+            { "MissionNamePrefix", "[Niv. {0}] {1}" }
         };
 
         public static string T(string key)

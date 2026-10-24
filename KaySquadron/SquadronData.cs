@@ -122,7 +122,8 @@ namespace KaySquadron
                         list.Add(new SquadronMission 
                         { 
                             Id = (uint)row.RowId, 
-                            Name = $"[Niv. {row.RequiredLevel}] {name}",
+                            Name = Loc.T("MissionNamePrefix", row.RequiredLevel, name),
+                            RawName = name,
                             LevelRequirement = (int)row.RequiredLevel, 
                             RequiredAttributes = new Attributes(
                                 row.ExpeditionParams[5].RequiredPhysical, 

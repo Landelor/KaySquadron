@@ -51,6 +51,11 @@ namespace KaySquadron
     {
         public uint Id { get; set; }
         public string Name { get; set; } = string.Empty;
+
+        /// <summary>The unprefixed mission name as shown in the native game UI (used to match
+        /// against AgentGcArmyExpedition's live selection; Name adds a "[Lvl X]" prefix for
+        /// display in our own dropdown).</summary>
+        public string RawName { get; set; } = string.Empty;
         public int LevelRequirement { get; set; }
         public Attributes RequiredAttributes { get; set; }
         public bool IsFlagged { get; set; }

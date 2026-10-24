@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 
 namespace KaySquadron
 {
@@ -21,6 +22,7 @@ namespace KaySquadron
         private Optimizer _optimizer = new();
         private Attributes _currentTraining = new(0, 0, 0);
         private readonly Configuration _configuration;
+        private int _lastSyncedMissionRow = -1;
 
         private void AddDebug(string msg)
         {
@@ -35,21 +37,39 @@ namespace KaySquadron
             
             _missions = SquadronData.GetMissions();
             _trainingCourses = SquadronData.GetTrainingCourses();
-            _members = new List<SquadronMember>();
-            
-            // Default members for testing
-            for (int i = 0; i < 8; i++)
+
+            if (_configuration.SavedMembers.Count > 0)
             {
-                _members.Add(new SquadronMember 
-                { 
-                    Name = Loc.T("RecruitPlaceholder", i + 1), 
-                    Level = 50, 
-                    ClassId = (int)SquadronData.SquadronClass.Marauder,
-                    ClassName = SquadronData.SquadronClass.Marauder.ToString(),
-                    BaseAttributes = SquadronData.GetBaseStats(SquadronData.SquadronClass.Marauder, 50)
-                });
+                // Restore the roster (and banked training) from the last successful import.
+                _members = _configuration.SavedMembers;
+                _currentTraining = _configuration.SavedTraining;
+            }
+            else
+            {
+                _members = new List<SquadronMember>();
+
+                // Default members for testing
+                for (int i = 0; i < 8; i++)
+                {
+                    _members.Add(new SquadronMember 
+                    { 
+                        Name = Loc.T("RecruitPlaceholder", i + 1), 
+                        Level = 50, 
+                        ClassId = (int)SquadronData.SquadronClass.Marauder,
+                        ClassName = SquadronData.SquadronClass.Marauder.ToString(),
+                        BaseAttributes = SquadronData.GetBaseStats(SquadronData.SquadronClass.Marauder, 50)
+                    });
+                }
             }
             AddDebug(Loc.T("ErrInit"));
+        }
+
+        /// <summary>Persists the current roster and banked training so they survive restarts.</summary>
+        private void PersistMembers()
+        {
+            _configuration.SavedMembers = _members;
+            _configuration.SavedTraining = _currentTraining;
+            _configuration.Save();
         }
 
         private void PushKayTheme()
@@ -97,6 +117,8 @@ namespace KaySquadron
 
         public override void Draw()
         {
+            SyncSelectedMissionFromGame();
+
             PushKayTheme();
             if (ImGui.BeginTabBar("SquadronTabs"))
             {
@@ -118,6 +140,44 @@ namespace KaySquadron
 
 
 
+
+        /// <summary>
+        /// Mirrors the mission row currently highlighted in the native Squadron Missions
+        /// window (AgentGcArmyExpedition.SelectedRow) into our own mission dropdown, so
+        /// clicking a mission there auto-selects it here. Best-effort: silently does nothing
+        /// if the agent/addon isn't open or the native name can't be matched.
+        /// </summary>
+        private unsafe void SyncSelectedMissionFromGame()
+        {
+            try
+            {
+                var agent = AgentGcArmyExpedition.Instance();
+                if (agent == null || agent->ExpeditionData == null) return;
+
+                int row = agent->SelectedRow;
+                if (row == _lastSyncedMissionRow) return;
+                _lastSyncedMissionRow = row;
+
+                if (row < 0 || row >= agent->ExpeditionData->NumEntries) return;
+
+                string nativeName = agent->ExpeditionData->MissionInfo[row].Name.ToString();
+                if (string.IsNullOrWhiteSpace(nativeName)) return;
+
+                var match = _missions.FirstOrDefault(m => m.RawName == nativeName);
+                if (match != null)
+                {
+                    _selectedMission = match;
+                }
+                else
+                {
+                    AddDebug($"Mission sync: no match for native row name '{nativeName}'");
+                }
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.Error($"Mission sync error: {ex}");
+            }
+        }
 
         private void DrawOptimizationTab()
         {
@@ -297,12 +357,12 @@ namespace KaySquadron
                 
                 ImGui.SetNextItemWidth(140);
                 string name = m.Name;
-                if (ImGui.InputText("##Name", ref name, 32)) m.Name = name;
+                if (ImGui.InputText("##Name", ref name, 32)) { m.Name = name; PersistMembers(); }
                 
                 ImGui.SameLine();
                 ImGui.SetNextItemWidth(70);
                 int level = m.Level;
-                if (ImGui.InputInt("##Niv", ref level, 0, 0)) m.Level = Math.Clamp(level, 1, 60);
+                if (ImGui.InputInt("##Niv", ref level, 0, 0)) { m.Level = Math.Clamp(level, 1, 60); PersistMembers(); }
                 
                 ImGui.SameLine();
                 ImGui.SetNextItemWidth(140);
@@ -314,6 +374,7 @@ namespace KaySquadron
                         {
                             m.ClassId = (int)job;
                             m.ClassName = job.ToString();
+                            PersistMembers();
                         }
                     }
                     ImGui.EndCombo();
@@ -426,6 +487,7 @@ namespace KaySquadron
                     AddDebug(Loc.T("ImportMemberLine", name, level, job.ToString()));
                 }
                 AddDebug(Loc.T("ImportComplete", _members.Count));
+                PersistMembers();
             }
             catch (Exception ex)
             {

@@ -1,6 +1,7 @@
 using Dalamud.Configuration;
 using Dalamud.Plugin;
 using System;
+using System.Collections.Generic;
 
 namespace KaySquadron
 {
@@ -19,6 +20,13 @@ namespace KaySquadron
         /// from the game's memory/sheets yet; bump it when your squadron ranks up.
         /// </summary>
         public int SquadronRank { get; set; } = 1;
+
+        /// <summary>Persisted squadron roster from the last successful in-game import,
+        /// so members survive plugin/game restarts without needing to re-import.</summary>
+        public List<SquadronMember> SavedMembers { get; set; } = new();
+
+        /// <summary>Training bonus already banked on the squadron, from the last import.</summary>
+        public Attributes SavedTraining { get; set; } = new(0, 0, 0);
 
         [NonSerialized]
         private IDalamudPluginInterface? _pluginInterface;
