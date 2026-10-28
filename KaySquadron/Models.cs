@@ -2,7 +2,7 @@ using System;
 
 namespace KaySquadron
 {
-    public struct Attributes
+    public struct Attributes : IEquatable<Attributes>
     {
         public int Physical;
         public int Mental;
@@ -34,6 +34,13 @@ namespace KaySquadron
             if (Tactical >= requirement.Tactical) count++;
             return count;
         }
+
+        public bool Equals(Attributes other) 
+            => Physical == other.Physical && Mental == other.Mental && Tactical == other.Tactical;
+
+        public override bool Equals(object? obj) => obj is Attributes other && Equals(other);
+
+        public override int GetHashCode() => HashCode.Combine(Physical, Mental, Tactical);
     }
 
     public class SquadronMember

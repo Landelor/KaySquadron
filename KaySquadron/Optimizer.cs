@@ -23,32 +23,7 @@ namespace KaySquadron
     {
         private const int TrainingStep = 20;
 
-        // Cached per total-points pool (200/300/400) so repeated Optimize() calls at the
-        // same Squadron Rank don't regenerate the same distribution list every time.
-        private static readonly Dictionary<int, List<Attributes>> _distributionCache = new();
-
-        private static List<Attributes> GetTrainingDistributions(int totalPoints)
-        {
-            if (_distributionCache.TryGetValue(totalPoints, out var cached))
-            {
-                return cached;
-            }
-
-            var distributions = new List<Attributes>();
-            for (int p = 0; p <= totalPoints; p += TrainingStep)
-            {
-                for (int m = 0; m <= totalPoints - p; m += TrainingStep)
-                {
-                    for (int t = 0; t <= totalPoints - p - m; t += TrainingStep)
-                    {
-                        distributions.Add(new Attributes(p, m, t));
-                    }
-                }
-            }
-
-            _distributionCache[totalPoints] = distributions;
-            return distributions;
-        }
+        private readonly record struct VisitInfo(int Sessions, Attributes? Prev, TrainingCourse? Via);
 
         /// <param name="maxTrainingPoints">
         /// Total board-training points available at the squadron's current Rank
@@ -56,43 +31,25 @@ namespace KaySquadron
         /// </param>
         /// <param name="currentTraining">
         /// Training bonus already banked on the squadron (read via GcArmyManager, or zero if
-        /// not yet imported). Training only ever adds, so candidate targets below this are
-        /// never considered, and candidates must be reachable from it in whole course sessions.
+        /// not yet imported).
         /// </param>
         /// <param name="courses">The Regimen Board's training courses (SquadronData.GetTrainingCourses()).</param>
         public List<OptimizationResult> Optimize(List<SquadronMember> allMembers, SquadronMission mission, int maxTrainingPoints, Attributes currentTraining, List<TrainingCourse> courses)
         {
             var results = new List<OptimizationResult>();
-            var byShape = BuildShapeLookup(courses);
-
-            // Every training session adds exactly 40 points total (either 40 to one stat, or
-            // 20+20 to two), so a target total is only reachable from currentTraining if it is
-            // at least as large on every axis AND the total difference is a whole number of
-            // sessions (a multiple of 40).
-            //
-            // currentTraining might exceed maxTrainingPoints if the player's selected Squadron
-            // Rank doesn't match their actual banked total (e.g. still on the Rank 1 default
-            // after actually ranking up) - in that case the candidate grid below would never
-            // contain anything >= currentTraining and we'd silently (and wrongly) fall back to
-            // "no further training needed" for every mission. Use whichever total is larger as
-            // the search ceiling so currentTraining is always a valid candidate; we still never
-            // recommend training BEYOND the user's selected rank unless they're already past it.
-            int currentTotal = currentTraining.Total;
-            int effectiveCap = Math.Max(maxTrainingPoints, currentTotal);
-            var validTargets = GetTrainingDistributions(effectiveCap)
-                .Where(t => t.Physical >= currentTraining.Physical
-                         && t.Mental >= currentTraining.Mental
-                         && t.Tactical >= currentTraining.Tactical
-                         && (t.Total - currentTotal) % 40 == 0)
+            var statCourses = courses
+                .Where(c => AxisCount(c.Bonus) == 1 || AxisCount(c.Bonus) == 2)
                 .ToList();
 
-            // Degenerate fallback (should not normally happen): if nothing lines up to a clean
-            // multiple of 40 sessions from the current total, just allow the banked total itself
-            // so the optimizer still returns a usable (if untrained-further) result.
-            if (validTargets.Count == 0)
-            {
-                validTargets.Add(currentTraining);
-            }
+            // Guard against a stale/mismatched Squadron Rank selection: never let the search
+            // ceiling fall below what's already banked (see the 1.4.1.0 fix).
+            int cap = Math.Max(maxTrainingPoints, currentTraining.Total);
+
+            // Explore every training state reachable from the banked total, in the minimum
+            // number of sessions, via BFS over the 6 stat-affecting courses. This is the same
+            // for every team (it only depends on currentTraining/cap/courses), so it's computed
+            // once and reused, rather than per team.
+            var reachable = ExploreReachableStates(currentTraining, statCourses, cap);
 
             // Combinations of 4 members from 8
             var combinations = GetCombinations(allMembers, 4);
@@ -106,29 +63,33 @@ namespace KaySquadron
                 }
 
                 OptimizationResult? bestForThisTeam = null;
+                int bestSessions = int.MaxValue;
 
-                foreach (var training in validTargets)
+                foreach (var pair in reachable)
                 {
-                    var finalStats = baseStats + training;
+                    var state = pair.Key;
+                    var info = pair.Value;
+                    var finalStats = baseStats + state;
                     int met = finalStats.RequirementsMetCount(mission.RequiredAttributes);
 
                     if (bestForThisTeam == null
                         || met > bestForThisTeam.RequirementsMet
-                        || (met == bestForThisTeam.RequirementsMet && training.Total < bestForThisTeam.BestTraining.Total))
+                        || (met == bestForThisTeam.RequirementsMet && info.Sessions < bestSessions))
                     {
                         bestForThisTeam = new OptimizationResult
                         {
                             Team = team.ToList(),
-                            BestTraining = training,
+                            BestTraining = state,
                             RequirementsMet = met,
                             FinalStats = finalStats
                         };
+                        bestSessions = info.Sessions;
                     }
                 }
 
                 if (bestForThisTeam != null)
                 {
-                    bestForThisTeam.TrainingPlan = DecomposeTrainingDelta(bestForThisTeam.BestTraining - currentTraining, byShape);
+                    bestForThisTeam.TrainingPlan = ReconstructPlan(bestForThisTeam.BestTraining, reachable);
                     results.Add(bestForThisTeam);
                 }
             }
@@ -141,80 +102,109 @@ namespace KaySquadron
                 .ToList();
         }
 
-        private static Dictionary<(bool p, bool m, bool t), TrainingCourse> BuildShapeLookup(List<TrainingCourse> courses)
-        {
-            var byShape = new Dictionary<(bool, bool, bool), TrainingCourse>();
-            foreach (var course in courses)
-            {
-                bool p = course.Bonus.Physical > 0;
-                bool m = course.Bonus.Mental > 0;
-                bool t = course.Bonus.Tactical > 0;
-                int axisCount = (p ? 1 : 0) + (m ? 1 : 0) + (t ? 1 : 0);
-                if (axisCount == 1 || axisCount == 2)
-                {
-                    byShape[(p, m, t)] = course;
-                }
-            }
-            return byShape;
-        }
+        private static int AxisCount(Attributes bonus)
+            => (bonus.Physical > 0 ? 1 : 0) + (bonus.Mental > 0 ? 1 : 0) + (bonus.Tactical > 0 ? 1 : 0);
 
         /// <summary>
-        /// Turns a non-negative training delta into the minimum number of Regimen Board
-        /// sessions that reach it: each session contributes exactly 2 "units" of 20 points,
-        /// either both to the same stat (Basic course) or one each to two different stats
-        /// (Advanced course). Greedily pairs the two neediest stats each step.
+        /// Applies one Regimen Board session's effect, modeling the game's actual mechanic:
+        /// the squadron's total bonus (P+M+T) can never exceed the rank cap. A course always
+        /// grants its full nominal bonus to its target stat(s); if doing so would push the
+        /// total over the cap, the excess is pulled back out of whichever stat(s) the course
+        /// does NOT target, taken preferentially from whichever untouched stat currently holds
+        /// the most (which naturally produces an even split when both have plenty, and shifts
+        /// the whole cost onto the other one once one hits 0). Below the cap this degenerates
+        /// to a pure addition (no redistribution needed). Confirmed against community worked
+        /// examples of exactly this redistribution behavior (see commit message for sources).
         /// </summary>
-        private static List<CourseRecommendation> DecomposeTrainingDelta(Attributes delta, Dictionary<(bool, bool, bool), TrainingCourse> byShape)
+        public static Attributes ApplyCourse(Attributes current, TrainingCourse course, int cap)
         {
-            int[] units =
-            {
-                Math.Max(0, delta.Physical) / TrainingStep,
-                Math.Max(0, delta.Mental) / TrainingStep,
-                Math.Max(0, delta.Tactical) / TrainingStep,
-            };
+            var afterGain = current + course.Bonus;
+            int excess = Math.Max(0, afterGain.Total - cap);
+            if (excess == 0) return afterGain;
 
+            var untouchedAxes = new List<int>();
+            if (course.Bonus.Physical == 0) untouchedAxes.Add(0);
+            if (course.Bonus.Mental == 0) untouchedAxes.Add(1);
+            if (course.Bonus.Tactical == 0) untouchedAxes.Add(2);
+
+            var reduced = RemoveUnits(afterGain, untouchedAxes, excess / TrainingStep);
+
+            // Defensive fallback for the fully-degenerate corner (one stat already holds the
+            // entire cap, so the untouched stat(s) have nothing left to give): shrink the
+            // course's own target gain instead, so the sum-<=-cap invariant always holds. None
+            // of the sources found describe this double-degenerate case explicitly; this is a
+            // conservative approximation to avoid ever exceeding the cap.
+            int stillExcess = Math.Max(0, reduced.Total - cap);
+            if (stillExcess > 0)
+            {
+                var targetAxes = new List<int>();
+                if (course.Bonus.Physical > 0) targetAxes.Add(0);
+                if (course.Bonus.Mental > 0) targetAxes.Add(1);
+                if (course.Bonus.Tactical > 0) targetAxes.Add(2);
+                reduced = RemoveUnits(reduced, targetAxes, stillExcess / TrainingStep);
+            }
+
+            return reduced;
+        }
+
+        /// <summary>Removes `units` x 20 points total from the given axes, each unit taken from
+        /// whichever eligible axis currently holds the most (floor-clamped at 0 per axis).</summary>
+        private static Attributes RemoveUnits(Attributes stats, List<int> axes, int units)
+        {
+            int[] vals = { stats.Physical, stats.Mental, stats.Tactical };
+            for (int u = 0; u < units; u++)
+            {
+                int best = -1, bestVal = 0;
+                foreach (var axis in axes)
+                {
+                    if (vals[axis] > bestVal) { bestVal = vals[axis]; best = axis; }
+                }
+                if (best == -1) break; // nothing left to take from any eligible axis
+                vals[best] -= TrainingStep;
+            }
+            return new Attributes(vals[0], vals[1], vals[2]);
+        }
+
+        private static Dictionary<Attributes, VisitInfo> ExploreReachableStates(Attributes start, List<TrainingCourse> courses, int cap)
+        {
+            var visited = new Dictionary<Attributes, VisitInfo> { [start] = new VisitInfo(0, null, null) };
+            var queue = new Queue<Attributes>();
+            queue.Enqueue(start);
+
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+                int sessions = visited[current].Sessions;
+
+                foreach (var course in courses)
+                {
+                    var next = ApplyCourse(current, course, cap);
+                    if (!visited.ContainsKey(next))
+                    {
+                        visited[next] = new VisitInfo(sessions + 1, current, course);
+                        queue.Enqueue(next);
+                    }
+                }
+            }
+
+            return visited;
+        }
+
+        private static List<CourseRecommendation> ReconstructPlan(Attributes target, Dictionary<Attributes, VisitInfo> reachable)
+        {
             var plan = new Dictionary<string, CourseRecommendation>();
+            var cursor = target;
 
-            void RunSession(bool p, bool m, bool t)
+            while (reachable.TryGetValue(cursor, out var info) && info.Prev.HasValue && info.Via.HasValue)
             {
-                if (!byShape.TryGetValue((p, m, t), out var course)) return;
-
+                var course = info.Via.Value;
                 if (!plan.TryGetValue(course.Name, out var rec))
                 {
                     rec = new CourseRecommendation { Course = course, Count = 0 };
                     plan[course.Name] = rec;
                 }
                 rec.Count++;
-            }
-
-            while (units[0] > 0 || units[1] > 0 || units[2] > 0)
-            {
-                int[] order = { 0, 1, 2 };
-                Array.Sort(order, (x, y) => units[y].CompareTo(units[x]));
-                int top = order[0];
-                int second = order[1];
-
-                if (units[top] == 0) break; // nothing left to allocate
-
-                bool p = false, m = false, t = false;
-                void SetAxis(int axis) { if (axis == 0) p = true; else if (axis == 1) m = true; else t = true; }
-
-                if (units[second] > 0)
-                {
-                    // Pair the two neediest stats with the matching Advanced course.
-                    SetAxis(top);
-                    SetAxis(second);
-                    units[top]--;
-                    units[second]--;
-                }
-                else
-                {
-                    // Only one stat left needing points - use its Basic course (2 units/session).
-                    SetAxis(top);
-                    units[top] -= Math.Min(2, units[top]);
-                }
-
-                RunSession(p, m, t);
+                cursor = info.Prev.Value;
             }
 
             return plan.Values.OrderByDescending(c => c.Count).ToList();

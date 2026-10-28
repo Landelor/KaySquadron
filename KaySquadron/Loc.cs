@@ -73,7 +73,7 @@ namespace KaySquadron
             { "TrainingPlanNone", "Already there - no further training needed!" },
             { "MissionNamePrefix", "[Lvl. {0}] {1}" },
             { "RankMismatchWarning", "⚠ Your banked training ({0} pts) exceeds the selected Rank's cap ({1} pts) - check the Squadron Rank setting above." },
-            { "TrainingPlanStuck", "⚠ Requirements not fully met, and no further training is possible within a {0}-pt cap. Your Squadron Rank setting may be too low - check it above." }
+            { "TrainingPlanStuck", "⚠ No reachable training allocation within a {0}-pt cap meets this mission. If your Squadron Rank setting looks right, this mission may be out of reach for this roster - try a different team or level up your recruits." }
         };
 
         private static readonly Dictionary<string, string> FrenchStrings = new()
@@ -137,7 +137,7 @@ namespace KaySquadron
             { "TrainingPlanNone", "Déjà atteint - aucun entraînement supplémentaire requis !" },
             { "MissionNamePrefix", "[Niv. {0}] {1}" },
             { "RankMismatchWarning", "⚠ Votre entraînement banqué ({0} pts) dépasse le plafond du Rang sélectionné ({1} pts) - vérifiez le réglage du Rang d'Escouade ci-dessus." },
-            { "TrainingPlanStuck", "⚠ Prérequis non remplis, et aucun entraînement supplémentaire n'est possible avec un plafond de {0} pts. Votre réglage de Rang d'Escouade est peut-être trop bas - vérifiez-le ci-dessus." }
+            { "TrainingPlanStuck", "⚠ Aucune répartition d'entraînement possible avec un plafond de {0} pts ne permet d'atteindre cette mission. Si votre réglage de Rang semble correct, cette mission est peut-être hors de portée pour cette escouade - essayez une autre équipe ou montez vos recrues en niveau." }
         };
 
         public static string T(string key)
