@@ -107,14 +107,21 @@ namespace KaySquadron
 
         /// <summary>
         /// Applies one Regimen Board session's effect, modeling the game's actual mechanic:
-        /// the squadron's total bonus (P+M+T) can never exceed the rank cap. A course always
-        /// grants its full nominal bonus to its target stat(s); if doing so would push the
-        /// total over the cap, the excess is pulled back out of whichever stat(s) the course
-        /// does NOT target, taken preferentially from whichever untouched stat currently holds
-        /// the most (which naturally produces an even split when both have plenty, and shifts
-        /// the whole cost onto the other one once one hits 0). Below the cap this degenerates
-        /// to a pure addition (no redistribution needed). Confirmed against community worked
-        /// examples of exactly this redistribution behavior (see commit message for sources).
+        /// the squadron's total bonus (P+M+T) can never exceed the rank cap. A course grants its
+        /// full nominal bonus to its target stat(s) ONLY if the stat(s) it does NOT target hold
+        /// enough combined value to fund the resulting excess; if they don't, the ENTIRE course
+        /// is wasted - no change at all, not a partial effect, and it never dips into its own
+        /// target stat(s) to make up the difference.
+        ///
+        /// Confirmed live: starting at 100/40/60 (cap 200), running Basic Training: Physical
+        /// gives 140/20/40 (the 40-point cost split across Mental and Tactical, both of which
+        /// had enough). Running Advanced Training: Physical & Tactical from THAT state produces
+        /// literally no change at all - its only untouched stat, Mental, has just 20 banked but
+        /// the course needs 40 to fund its +20/+20 gain, so it fails outright rather than only
+        /// partially applying or encroaching on Physical/Tactical. Running the courses in the
+        /// opposite order (Advanced first, then Basic) succeeds for both and reaches a higher
+        /// total, since Advanced-first only ever needs to draw from Mental while it still has
+        /// the full 40 to give.
         /// </summary>
         public static Attributes ApplyCourse(Attributes current, TrainingCourse course, int cap)
         {
@@ -127,24 +134,14 @@ namespace KaySquadron
             if (course.Bonus.Mental == 0) untouchedAxes.Add(1);
             if (course.Bonus.Tactical == 0) untouchedAxes.Add(2);
 
-            var reduced = RemoveUnits(afterGain, untouchedAxes, excess / TrainingStep);
+            int[] afterVals = { afterGain.Physical, afterGain.Mental, afterGain.Tactical };
+            int availableInUntouched = untouchedAxes.Sum(a => afterVals[a]);
 
-            // Defensive fallback for the fully-degenerate corner (one stat already holds the
-            // entire cap, so the untouched stat(s) have nothing left to give): shrink the
-            // course's own target gain instead, so the sum-<=-cap invariant always holds. None
-            // of the sources found describe this double-degenerate case explicitly; this is a
-            // conservative approximation to avoid ever exceeding the cap.
-            int stillExcess = Math.Max(0, reduced.Total - cap);
-            if (stillExcess > 0)
-            {
-                var targetAxes = new List<int>();
-                if (course.Bonus.Physical > 0) targetAxes.Add(0);
-                if (course.Bonus.Mental > 0) targetAxes.Add(1);
-                if (course.Bonus.Tactical > 0) targetAxes.Add(2);
-                reduced = RemoveUnits(reduced, targetAxes, stillExcess / TrainingStep);
-            }
+            // Not enough banked in the untouched stat(s) to fund this course's deduction -
+            // the whole course is wasted, unchanged from `current`.
+            if (availableInUntouched < excess) return current;
 
-            return reduced;
+            return RemoveUnits(afterGain, untouchedAxes, excess / TrainingStep);
         }
 
         /// <summary>Removes `units` x 20 points total from the given axes, each unit taken from
@@ -190,24 +187,42 @@ namespace KaySquadron
             return visited;
         }
 
+        /// <summary>
+        /// Walks the BFS path from `target` back to the banked start, then reverses it so the
+        /// returned list is in the EXACT order the sessions must be run. Order is not cosmetic:
+        /// once at the rank cap, a course only succeeds if its untouched stat(s) hold enough to
+        /// fund it (see ApplyCourse) - running the same two courses in a different order can
+        /// genuinely produce a worse (or completely different) result, confirmed live. Only
+        /// directly-adjacent identical courses are merged into a single "xN" entry; anything
+        /// non-adjacent stays as separate, order-preserving steps.
+        /// </summary>
         private static List<CourseRecommendation> ReconstructPlan(Attributes target, Dictionary<Attributes, VisitInfo> reachable)
         {
-            var plan = new Dictionary<string, CourseRecommendation>();
+            var steps = new List<TrainingCourse>();
             var cursor = target;
 
             while (reachable.TryGetValue(cursor, out var info) && info.Prev.HasValue && info.Via.HasValue)
             {
-                var course = info.Via.Value;
-                if (!plan.TryGetValue(course.Name, out var rec))
-                {
-                    rec = new CourseRecommendation { Course = course, Count = 0 };
-                    plan[course.Name] = rec;
-                }
-                rec.Count++;
+                steps.Add(info.Via.Value);
                 cursor = info.Prev.Value;
             }
 
-            return plan.Values.OrderByDescending(c => c.Count).ToList();
+            steps.Reverse(); // was target->start, now start->target (the order to actually run them in)
+
+            var plan = new List<CourseRecommendation>();
+            foreach (var course in steps)
+            {
+                if (plan.Count > 0 && plan[^1].Course.Name == course.Name)
+                {
+                    plan[^1].Count++;
+                }
+                else
+                {
+                    plan.Add(new CourseRecommendation { Course = course, Count = 1 });
+                }
+            }
+
+            return plan;
         }
 
         private static IEnumerable<IEnumerable<T>> GetCombinations<T>(IEnumerable<T> list, int length)

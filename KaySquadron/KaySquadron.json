@@ -2,7 +2,7 @@
     "Author": "Landelor",
     "Name": "KaySquadron",
     "InternalName": "KaySquadron",
-    "AssemblyVersion": "1.7.1.0",
+    "AssemblyVersion": "1.8.0.0",
     "Description": "Grand Company (GC) Squadron Optimizer. Calculates attributes, success chances, and training recommendations for your barracks.",
     "ApplicableRegions": [
         "CN",

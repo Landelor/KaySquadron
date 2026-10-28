@@ -272,9 +272,15 @@ namespace KaySquadron
                         if (res.TrainingPlan.Count > 0)
                         {
                             ImGui.TextColored(new Vector4(0.01f, 0.95f, 1f, 1f), Loc.T("TrainingPlanLabel", res.SessionsNeeded));
+                            if (res.TrainingPlan.Count > 1)
+                            {
+                                ImGui.TextColored(new Vector4(1f, 0.85f, 0.2f, 1f), Loc.T("TrainingPlanOrderWarning"));
+                            }
+                            int step = 1;
                             foreach (var rec in res.TrainingPlan)
                             {
-                                ImGui.BulletText($"{rec.Course.Name}  x{rec.Count}  ({DescribeCourseBonus(rec.Course)})");
+                                ImGui.BulletText($"{step}. {rec.Course.Name}  x{rec.Count}  ({DescribeCourseBonus(rec.Course)})");
+                                step++;
                             }
                             int days = (int)Math.Ceiling(res.SessionsNeeded / 3.0);
                             ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), Loc.T("TrainingPlanDays", days));
