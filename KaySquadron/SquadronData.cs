@@ -95,7 +95,7 @@ namespace KaySquadron
         public static List<SquadronMission> GetMissions()
         {
             var list = new List<SquadronMission>();
-            int expeditionParamsIndex = GetExpeditionParamsIndex();
+            const int expeditionParamsIndex = ExpeditionRequirementSlot;
 
             try
             {
@@ -151,41 +151,16 @@ namespace KaySquadron
 
         /// <summary>
         /// GcArmyExpedition.ExpeditionParams has 6 slots per mission that all sum to the same
-        /// total difficulty but weight Physical/Mental/Tactical differently - the native UI
-        /// shows only ONE of them, and which one depends on the player's Grand Company
-        /// (PlayerState.GrandCompany: 1 = Maelstrom, 2 = Order of the Twin Adder,
-        /// 3 = Immortal Flames).
-        ///
-        /// Confirmed LIVE, twice, against two different missions: Maelstrom -> slot index 2.
-        /// Twin Adder and Immortal Flames are NOT yet confirmed and default to the same slot
-        /// as a best-effort guess pending someone in those GCs testing it - this is still a
-        /// strict improvement over the old unconditional (and confirmed-wrong) hardcoded
-        /// slot 5, which matched none of the GCs tested so far.
+        /// total difficulty but weight Physical/Mental/Tactical differently. The native UI
+        /// shows only ONE of them. This was originally assumed to be Grand-Company-dependent
+        /// (slots looked like they formed 3 GC-themed pairs), but that hypothesis was disproven
+        /// live: Maelstrom and Immortal Flames players both confirmed the exact same values
+        /// (slot index 2) for the same mission (Lvl 15 Pest Eradication, P320/M145/T225).
+        /// With 2 of the 3 GCs confirmed identical, slot 2 is treated as a GC-independent
+        /// constant - whatever the other 5 slots represent, they are not shown to players here.
+        /// Not yet confirmed for Order of the Twin Adder specifically, but given 2/2 agreement
+        /// so far there's no reason to expect it to differ.
         /// </summary>
-        private static int GetExpeditionParamsIndex()
-        {
-            const int confirmedMaelstromIndex = 2;
-            const int bestGuessForUnconfirmedGCs = 2;
-
-            try
-            {
-                unsafe
-                {
-                    var playerState = FFXIVClientStructs.FFXIV.Client.Game.UI.PlayerState.Instance();
-                    if (playerState == null) return bestGuessForUnconfirmedGCs;
-
-                    return playerState->GrandCompany switch
-                    {
-                        1 => confirmedMaelstromIndex, // Maelstrom - confirmed live against 2 missions
-                        _ => bestGuessForUnconfirmedGCs, // Twin Adder / Immortal Flames / unknown - unverified
-                    };
-                }
-            }
-            catch (System.Exception ex)
-            {
-                Plugin.Log.Error($"Failed to read Grand Company, defaulting mission requirement slot: {ex}");
-                return bestGuessForUnconfirmedGCs;
-            }
-        }
+        private const int ExpeditionRequirementSlot = 2;
     }
 }
