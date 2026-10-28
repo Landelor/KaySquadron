@@ -115,6 +115,25 @@ namespace KaySquadron
             ImGui.PopStyleVar(5);
         }
 
+        /// <summary>Changes the selected mission and clears any stale training suggestions from
+        /// a previous mission, so results shown always correspond to the currently-selected
+        /// mission rather than lingering from before.</summary>
+        private void SetSelectedMission(SquadronMission? mission)
+        {
+            if (_selectedMission?.Id == mission?.Id) return;
+            _selectedMission = mission;
+            _results.Clear();
+        }
+
+        /// <summary>Called by Dalamud's WindowSystem whenever this window is opened (shown).
+        /// Clears any training suggestions left over from a previous session so the
+        /// Optimization tab never shows stale results for a squad/mission state the player
+        /// hasn't re-confirmed this time around.</summary>
+        public override void OnOpen()
+        {
+            _results.Clear();
+        }
+
         public override void Draw()
         {
             SyncSelectedMissionFromGame();
@@ -166,7 +185,7 @@ namespace KaySquadron
                 var match = _missions.FirstOrDefault(m => m.RawName == nativeName);
                 if (match != null)
                 {
-                    _selectedMission = match;
+                    SetSelectedMission(match);
                 }
                 else
                 {
@@ -199,7 +218,7 @@ namespace KaySquadron
                 {
                     if (ImGui.Selectable($"{mission.Name}##{mission.Id}", _selectedMission?.Id == mission.Id))
                     {
-                        _selectedMission = mission;
+                        SetSelectedMission(mission);
                     }
                 }
                 ImGui.EndCombo();
