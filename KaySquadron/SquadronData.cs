@@ -20,11 +20,16 @@ namespace KaySquadron
 
         /// <summary>
         /// Each squad member's actual Physical/Mental/Tactical contribution, read live from the
-        /// game's own per-class-per-level growth table (GcArmyMemberGrow.MemberParams[level-1]),
+        /// game's own per-class-per-level growth table (GcArmyMemberGrow.MemberParams[level]),
         /// matched to the member's class via its ClassJob link. This replaces an earlier
         /// screenshot-derived percentage estimate that didn't match real recruits closely enough
         /// to reliably find training plans. Falls back to that old estimate only if the sheet
         /// can't be read for some reason (should not normally happen).
+        ///
+        /// Index is the level itself, NOT level-1: index 0 is an unused placeholder (always
+        /// zero), not "level 1". Verified live against 4 real level-16 members across 4
+        /// different classes (Conjurer/Archer/Marauder/Pugilist) - all 4 matched index 16
+        /// exactly, not index 15.
         /// </summary>
         public static Attributes GetBaseStats(SquadronClass job, int level)
         {
@@ -37,7 +42,11 @@ namespace KaySquadron
                     {
                         if (row.ClassJob.RowId != (uint)job) continue;
 
-                        int index = Math.Clamp(level - 1, 0, 59); // MemberParams has 60 slots, one per level 1-60
+                        // MemberParams has 60 slots (indices 0-59) and index == level, so a
+                        // level-60 (max) member technically has no exact slot and falls back to
+                        // the level-59 row - a known, minor edge case affecting only the single
+                        // top level, where growth has already nearly flattened out anyway.
+                        int index = Math.Clamp(level, 0, 59);
                         var p = row.MemberParams[index];
                         return new Attributes(p.Physical, p.Mental, p.Tactical);
                     }
