@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace KaySquadron
@@ -17,11 +18,38 @@ namespace KaySquadron
             Rogue = 29
         }
 
+        /// <summary>
+        /// Each squad member's actual Physical/Mental/Tactical contribution, read live from the
+        /// game's own per-class-per-level growth table (GcArmyMemberGrow.MemberParams[level-1]),
+        /// matched to the member's class via its ClassJob link. This replaces an earlier
+        /// screenshot-derived percentage estimate that didn't match real recruits closely enough
+        /// to reliably find training plans. Falls back to that old estimate only if the sheet
+        /// can't be read for some reason (should not normally happen).
+        /// </summary>
         public static Attributes GetBaseStats(SquadronClass job, int level)
         {
-            // Derived from screenshots: 
-            // Level 49 total = 192, Level 38 total = 170.
-            // Growth = 2 points per level. Base at level 1 = 96.
+            try
+            {
+                var sheet = Plugin.Data.GetExcelSheet<Lumina.Excel.Sheets.GcArmyMemberGrow>();
+                if (sheet != null)
+                {
+                    foreach (var row in sheet)
+                    {
+                        if (row.ClassJob.RowId != (uint)job) continue;
+
+                        int index = Math.Clamp(level - 1, 0, 59); // MemberParams has 60 slots, one per level 1-60
+                        var p = row.MemberParams[index];
+                        return new Attributes(p.Physical, p.Mental, p.Tactical);
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Plugin.Log.Error($"Failed to read live GcArmyMemberGrow stats, falling back to estimate: {ex}");
+            }
+
+            // Fallback estimate (screenshot-derived, not exact) - only reached if the live sheet
+            // lookup above fails outright.
             int total = 96 + (level - 1) * 2;
             
             return job switch
