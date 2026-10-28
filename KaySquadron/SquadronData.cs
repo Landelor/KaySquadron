@@ -95,7 +95,8 @@ namespace KaySquadron
         public static List<SquadronMission> GetMissions()
         {
             var list = new List<SquadronMission>();
-            
+            int expeditionParamsIndex = GetExpeditionParamsIndex();
+
             try
             {
                 var sheet = Plugin.Data.GetExcelSheet<Lumina.Excel.Sheets.GcArmyExpedition>();
@@ -119,6 +120,7 @@ namespace KaySquadron
                             }
                         } catch { }
                         
+                        var tier = row.ExpeditionParams[expeditionParamsIndex];
                         list.Add(new SquadronMission 
                         { 
                             Id = (uint)row.RowId, 
@@ -126,9 +128,9 @@ namespace KaySquadron
                             RawName = name,
                             LevelRequirement = (int)row.RequiredLevel, 
                             RequiredAttributes = new Attributes(
-                                row.ExpeditionParams[5].RequiredPhysical, 
-                                row.ExpeditionParams[5].RequiredMental, 
-                                row.ExpeditionParams[5].RequiredTactical)
+                                tier.RequiredPhysical, 
+                                tier.RequiredMental, 
+                                tier.RequiredTactical)
                         });
                     }
                 }
@@ -145,6 +147,45 @@ namespace KaySquadron
             }
 
             return list;
+        }
+
+        /// <summary>
+        /// GcArmyExpedition.ExpeditionParams has 6 slots per mission that all sum to the same
+        /// total difficulty but weight Physical/Mental/Tactical differently - the native UI
+        /// shows only ONE of them, and which one depends on the player's Grand Company
+        /// (PlayerState.GrandCompany: 1 = Maelstrom, 2 = Order of the Twin Adder,
+        /// 3 = Immortal Flames).
+        ///
+        /// Confirmed LIVE, twice, against two different missions: Maelstrom -> slot index 2.
+        /// Twin Adder and Immortal Flames are NOT yet confirmed and default to the same slot
+        /// as a best-effort guess pending someone in those GCs testing it - this is still a
+        /// strict improvement over the old unconditional (and confirmed-wrong) hardcoded
+        /// slot 5, which matched none of the GCs tested so far.
+        /// </summary>
+        private static int GetExpeditionParamsIndex()
+        {
+            const int confirmedMaelstromIndex = 2;
+            const int bestGuessForUnconfirmedGCs = 2;
+
+            try
+            {
+                unsafe
+                {
+                    var playerState = FFXIVClientStructs.FFXIV.Client.Game.UI.PlayerState.Instance();
+                    if (playerState == null) return bestGuessForUnconfirmedGCs;
+
+                    return playerState->GrandCompany switch
+                    {
+                        1 => confirmedMaelstromIndex, // Maelstrom - confirmed live against 2 missions
+                        _ => bestGuessForUnconfirmedGCs, // Twin Adder / Immortal Flames / unknown - unverified
+                    };
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Plugin.Log.Error($"Failed to read Grand Company, defaulting mission requirement slot: {ex}");
+                return bestGuessForUnconfirmedGCs;
+            }
         }
     }
 }
