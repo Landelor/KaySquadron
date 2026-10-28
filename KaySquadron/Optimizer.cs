@@ -69,8 +69,17 @@ namespace KaySquadron
             // 20+20 to two), so a target total is only reachable from currentTraining if it is
             // at least as large on every axis AND the total difference is a whole number of
             // sessions (a multiple of 40).
+            //
+            // currentTraining might exceed maxTrainingPoints if the player's selected Squadron
+            // Rank doesn't match their actual banked total (e.g. still on the Rank 1 default
+            // after actually ranking up) - in that case the candidate grid below would never
+            // contain anything >= currentTraining and we'd silently (and wrongly) fall back to
+            // "no further training needed" for every mission. Use whichever total is larger as
+            // the search ceiling so currentTraining is always a valid candidate; we still never
+            // recommend training BEYOND the user's selected rank unless they're already past it.
             int currentTotal = currentTraining.Total;
-            var validTargets = GetTrainingDistributions(maxTrainingPoints)
+            int effectiveCap = Math.Max(maxTrainingPoints, currentTotal);
+            var validTargets = GetTrainingDistributions(effectiveCap)
                 .Where(t => t.Physical >= currentTraining.Physical
                          && t.Mental >= currentTraining.Mental
                          && t.Tactical >= currentTraining.Tactical

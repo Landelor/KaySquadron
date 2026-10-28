@@ -184,6 +184,10 @@ namespace KaySquadron
             ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), Loc.T("OptimizationIntro1"));
             ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), Loc.T("OptimizationIntro2"));
             ImGui.TextColored(new Vector4(0.5f, 0.8f, 0.5f, 1f), Loc.T("CurrentTrainingStatus", $"💪 {_currentTraining.Physical}", $"🧠 {_currentTraining.Mental}", $"🎯 {_currentTraining.Tactical}"));
+            if (_currentTraining.Total > SquadronData.GetMaxTrainingPoints(_configuration.SquadronRank))
+            {
+                ImGui.TextColored(new Vector4(1f, 0.6f, 0.1f, 1f), Loc.T("RankMismatchWarning", _currentTraining.Total, SquadronData.GetMaxTrainingPoints(_configuration.SquadronRank)));
+            }
             ImGui.Spacing();
             
             ImGui.TextColored(new Vector4(0.01f, 0.95f, 1f, 1f), Loc.T("SelectMission"));
@@ -275,9 +279,13 @@ namespace KaySquadron
                             int days = (int)Math.Ceiling(res.SessionsNeeded / 3.0);
                             ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), Loc.T("TrainingPlanDays", days));
                         }
-                        else
+                        else if (isPerfect)
                         {
                             ImGui.TextColored(new Vector4(0.4f, 1f, 0.4f, 1f), Loc.T("TrainingPlanNone"));
+                        }
+                        else
+                        {
+                            ImGui.TextColored(new Vector4(1f, 0.6f, 0.1f, 1f), Loc.T("TrainingPlanStuck", maxTrainingPoints));
                         }
 
                         ImGui.Spacing();

@@ -71,7 +71,9 @@ namespace KaySquadron
             { "TrainingPlanLabel", "Recommended training plan ({0} sessions):" },
             { "TrainingPlanDays", "~{0} day(s) at 3 sessions/day" },
             { "TrainingPlanNone", "Already there - no further training needed!" },
-            { "MissionNamePrefix", "[Lvl. {0}] {1}" }
+            { "MissionNamePrefix", "[Lvl. {0}] {1}" },
+            { "RankMismatchWarning", "⚠ Your banked training ({0} pts) exceeds the selected Rank's cap ({1} pts) - check the Squadron Rank setting above." },
+            { "TrainingPlanStuck", "⚠ Requirements not fully met, and no further training is possible within a {0}-pt cap. Your Squadron Rank setting may be too low - check it above." }
         };
 
         private static readonly Dictionary<string, string> FrenchStrings = new()
@@ -133,7 +135,9 @@ namespace KaySquadron
             { "TrainingPlanLabel", "Plan d'entraînement recommandé ({0} séances) :" },
             { "TrainingPlanDays", "~{0} jour(s) à 3 séances/jour" },
             { "TrainingPlanNone", "Déjà atteint - aucun entraînement supplémentaire requis !" },
-            { "MissionNamePrefix", "[Niv. {0}] {1}" }
+            { "MissionNamePrefix", "[Niv. {0}] {1}" },
+            { "RankMismatchWarning", "⚠ Votre entraînement banqué ({0} pts) dépasse le plafond du Rang sélectionné ({1} pts) - vérifiez le réglage du Rang d'Escouade ci-dessus." },
+            { "TrainingPlanStuck", "⚠ Prérequis non remplis, et aucun entraînement supplémentaire n'est possible avec un plafond de {0} pts. Votre réglage de Rang d'Escouade est peut-être trop bas - vérifiez-le ci-dessus." }
         };
 
         public static string T(string key)
