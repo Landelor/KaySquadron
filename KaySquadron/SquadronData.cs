@@ -132,12 +132,10 @@ namespace KaySquadron
         public static List<SquadronMission> GetMissions()
         {
             var list = new List<SquadronMission>();
-            const int expeditionParamsIndex = ExpeditionRequirementSlot;
 
             try
             {
                 var sheet = Plugin.Data.GetExcelSheet<Lumina.Excel.Sheets.GcArmyExpedition>();
-                var typeSheet = Plugin.Data.GetExcelSheet<Lumina.Excel.Sheets.GcArmyExpeditionType>();
                 
                 if (sheet != null)
                 {
@@ -157,7 +155,7 @@ namespace KaySquadron
                             }
                         } catch { }
                         
-                        var tier = row.ExpeditionParams[expeditionParamsIndex];
+                        var tier = row.ExpeditionParams[GetExpeditionRequirementSlot(row.GcArmyExpeditionType.RowId)];
                         list.Add(new SquadronMission 
                         { 
                             Id = (uint)row.RowId, 
@@ -189,15 +187,17 @@ namespace KaySquadron
         /// <summary>
         /// GcArmyExpedition.ExpeditionParams has 6 slots per mission that all sum to the same
         /// total difficulty but weight Physical/Mental/Tactical differently. The native UI
-        /// shows only ONE of them. This was originally assumed to be Grand-Company-dependent
-        /// (slots looked like they formed 3 GC-themed pairs), but that hypothesis was disproven
-        /// live: Maelstrom and Immortal Flames players both confirmed the exact same values
-        /// (slot index 2) for the same mission (Lvl 15 Pest Eradication, P320/M145/T225).
-        /// With 2 of the 3 GCs confirmed identical, slot 2 is treated as a GC-independent
-        /// constant - whatever the other 5 slots represent, they are not shown to players here.
-        /// Not yet confirmed for Order of the Twin Adder specifically, but given 2/2 agreement
-        /// so far there's no reason to expect it to differ.
+        /// shows only ONE of them.
+        ///
+        /// Earlier assumed to be a fixed constant (slot 2) after 2 Trainee-tier missions both
+        /// confirmed that slot - WRONG, disproven live: a Routine-tier mission (Lvl 25 Border
+        /// Patrol) confirmed slot 3 instead, not slot 2. The actual rule is keyed by the
+        /// mission's GcArmyExpeditionType (Trainee=1/Routine=2/Priority=3):
+        ///   Trainee Mission (type 1) -> slot 2  (confirmed live x2: Pest Eradication, Supply Wagon Escort)
+        ///   Routine Mission (type 2) -> slot 3  (confirmed live x1: Border Patrol)
+        ///   Priority Mission (type 3) -> slot 4 (NOT yet confirmed live - follows the type+1 pattern)
+        /// If a Priority mission is ever reported mismatched, this is the first place to check.
         /// </summary>
-        private const int ExpeditionRequirementSlot = 2;
+        private static int GetExpeditionRequirementSlot(uint expeditionType) => Math.Clamp((int)expeditionType + 1, 0, 5);
     }
 }
