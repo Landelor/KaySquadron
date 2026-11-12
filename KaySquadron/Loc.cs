@@ -74,7 +74,9 @@ namespace KaySquadron
             { "TrainingPlanNone", "Already there - no further training needed!" },
             { "MissionNamePrefix", "[Lvl. {0}] {1}" },
             { "RankMismatchWarning", "⚠ Your banked training ({0} pts) exceeds the selected Rank's cap ({1} pts) - check the Squadron Rank setting above." },
-            { "TrainingPlanStuck", "⚠ No reachable training allocation within a {0}-pt cap meets this mission. If your Squadron Rank setting looks right, this mission may be out of reach for this roster - try a different team or level up your recruits." }
+            { "TrainingPlanStuck", "⚠ No reachable training allocation within a {0}-pt cap meets this mission. If your Squadron Rank setting looks right, this mission may be out of reach for this roster - try a different team or level up your recruits." },
+            { "RequirementSourceLive", "live from game" },
+            { "RequirementSourceEstimated", "estimated - open the Squadron Missions window with this mission selected for an exact value" }
         };
 
         private static readonly Dictionary<string, string> FrenchStrings = new()
@@ -139,7 +141,9 @@ namespace KaySquadron
             { "TrainingPlanNone", "Déjà atteint - aucun entraînement supplémentaire requis !" },
             { "MissionNamePrefix", "[Niv. {0}] {1}" },
             { "RankMismatchWarning", "⚠ Votre entraînement banqué ({0} pts) dépasse le plafond du Rang sélectionné ({1} pts) - vérifiez le réglage du Rang d'Escouade ci-dessus." },
-            { "TrainingPlanStuck", "⚠ Aucune répartition d'entraînement possible avec un plafond de {0} pts ne permet d'atteindre cette mission. Si votre réglage de Rang semble correct, cette mission est peut-être hors de portée pour cette escouade - essayez une autre équipe ou montez vos recrues en niveau." }
+            { "TrainingPlanStuck", "⚠ Aucune répartition d'entraînement possible avec un plafond de {0} pts ne permet d'atteindre cette mission. Si votre réglage de Rang semble correct, cette mission est peut-être hors de portée pour cette escouade - essayez une autre équipe ou montez vos recrues en niveau." },
+            { "RequirementSourceLive", "en direct du jeu" },
+            { "RequirementSourceEstimated", "estimé - ouvrez la fenêtre des Missions d'Escouade avec cette mission sélectionnée pour une valeur exacte" }
         };
 
         public static string T(string key)

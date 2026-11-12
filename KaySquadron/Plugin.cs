@@ -19,6 +19,7 @@ namespace KaySquadron
         [PluginService] public static ICondition Condition { get; private set; } = null!;
         [PluginService] public static IClientState ClientState { get; private set; } = null!;
         [PluginService] public static IAddonLifecycle AddonLifecycle { get; private set; } = null!;
+        [PluginService] public static IGameGui GameGui { get; private set; } = null!;
 
         public string Name => "KaySquadron";
         private const string CommandName = "/ksquad";

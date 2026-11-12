@@ -21,6 +21,7 @@ namespace KaySquadron
         private List<OptimizationResult> _results = new();
         private Optimizer _optimizer = new();
         private Attributes _currentTraining = new(0, 0, 0);
+        private Attributes? _liveRequiredAttributesOverride;
         private readonly Configuration _configuration;
         private int _lastSyncedMissionRow = -1;
 
@@ -125,6 +126,17 @@ namespace KaySquadron
             _results.Clear();
         }
 
+        /// <summary>
+        /// The Required Physical/Mental/Tactical actually used for display and optimization.
+        /// Prefers a live read from the native Squadron Missions window when available (see
+        /// TryReadLiveRequiredAttributes) over the static sheet guess on SquadronMission,
+        /// because GcArmyExpedition's required-attribute sheet data has repeatedly turned out
+        /// to rotate in a way no static formula predicted correctly (confirmed wrong 3 times
+        /// running: a fixed slot, then slot-by-mission-type - both disproven live). Reading
+        /// what the game itself displays sidesteps needing to know why or how it rotates.
+        /// </summary>
+        private Attributes? EffectiveRequiredAttributes => _liveRequiredAttributesOverride ?? _selectedMission?.RequiredAttributes;
+
         /// <summary>Called by Dalamud's WindowSystem whenever this window is opened (shown).
         /// Clears any training suggestions left over from a previous session so the
         /// Optimization tab never shows stale results for a squad/mission state the player
@@ -137,6 +149,7 @@ namespace KaySquadron
         public override void Draw()
         {
             SyncSelectedMissionFromGame();
+            _liveRequiredAttributesOverride = TryReadLiveRequiredAttributes();
 
             PushKayTheme();
             if (ImGui.BeginTabBar("SquadronTabs"))
@@ -198,6 +211,66 @@ namespace KaySquadron
             }
         }
 
+        /// <summary>
+        /// Reads the Required Physical/Mental/Tactical numbers directly from the native
+        /// Squadron Missions window's own "Required Attributes" display, instead of guessing
+        /// which of GcArmyExpedition's 6 ExpeditionParams slots is active. Necessary because
+        /// that selection has proven NOT to follow any static formula we could find (constant
+        /// slot, then slot-by-mission-type - both disproven against different real missions);
+        /// the live display is the one thing guaranteed to always be correct, since it's
+        /// whatever the game itself is showing the player.
+        ///
+        /// Best-effort and read-only: finds every Text node inside RequiredAttributesComponentNode,
+        /// keeps ones that parse as a plain positive number, and orders them top-to-bottom by
+        /// screen Y position (the convention used everywhere else in this UI is Physical/
+        /// Mental/Tactical, top to bottom). Returns null (falling back to the sheet guess) if
+        /// the addon isn't open, the component is missing, or anything other than exactly 3
+        /// numeric labels is found - this is intentionally conservative, since a wrong guess
+        /// here would be worse than silently falling back to the existing sheet-based value.
+        /// </summary>
+        private unsafe Attributes? TryReadLiveRequiredAttributes()
+        {
+            try
+            {
+                var addonPtr = Plugin.GameGui.GetAddonByName("GcArmyExpedition");
+                if (addonPtr.Address == 0) return null;
+                var addon = (FFXIVClientStructs.FFXIV.Client.UI.AddonGcArmyExpedition*)addonPtr.Address;
+                if (addon == null) return null;
+
+                var component = addon->RequiredAttributesComponentNode;
+                if (component == null) return null;
+
+                var candidates = new List<(float ScreenY, int Value)>();
+                foreach (var nodePtr in component->UldManager.Nodes)
+                {
+                    var node = nodePtr.Value;
+                    if (node == null || node->Type != FFXIVClientStructs.FFXIV.Component.GUI.NodeType.Text) continue;
+
+                    var textNode = (FFXIVClientStructs.FFXIV.Component.GUI.AtkTextNode*)node;
+                    string text = textNode->NodeText.ToString();
+                    string digits = new string(text.Where(char.IsDigit).ToArray());
+                    if (digits.Length > 0 && int.TryParse(digits, out int value) && value > 0)
+                    {
+                        candidates.Add((node->ScreenY, value));
+                    }
+                }
+
+                if (candidates.Count != 3)
+                {
+                    AddDebug($"Live requirement read: expected 3 numeric labels, found {candidates.Count} - falling back to sheet guess.");
+                    return null;
+                }
+
+                var ordered = candidates.OrderBy(c => c.ScreenY).Select(c => c.Value).ToList();
+                return new Attributes(ordered[0], ordered[1], ordered[2]);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.Error($"Live requirement read failed: {ex}");
+                return null;
+            }
+        }
+
         private void DrawOptimizationTab()
         {
             ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), Loc.T("OptimizationIntro1"));
@@ -222,6 +295,17 @@ namespace KaySquadron
                     }
                 }
                 ImGui.EndCombo();
+            }
+
+            if (_selectedMission != null)
+            {
+                var required = EffectiveRequiredAttributes ?? _selectedMission.RequiredAttributes;
+                string source = _liveRequiredAttributesOverride.HasValue ? Loc.T("RequirementSourceLive") : Loc.T("RequirementSourceEstimated");
+                var sourceColor = _liveRequiredAttributesOverride.HasValue ? new Vector4(0.4f, 1f, 0.4f, 1f) : new Vector4(1f, 0.7f, 0.2f, 1f);
+                ImGui.TextColored(new Vector4(0.8f, 0.8f, 0.8f, 1f),
+                    $" 💪 {required.Physical}   🧠 {required.Mental}   🎯 {required.Tactical}");
+                ImGui.SameLine();
+                ImGui.TextColored(sourceColor, $"({source})");
             }
 
             ImGui.Spacing();
@@ -252,7 +336,17 @@ namespace KaySquadron
 
             if (ImGui.Button(Loc.T("OptimizeBtn"), new Vector2(ImGui.GetContentRegionAvail().X / 2 - 4, 40)) && _selectedMission != null)
             {
-                _results = _optimizer.Optimize(_members, _selectedMission, maxTrainingPoints, _currentTraining, _trainingCourses);
+                var effectiveMission = new SquadronMission
+                {
+                    Id = _selectedMission.Id,
+                    Name = _selectedMission.Name,
+                    RawName = _selectedMission.RawName,
+                    LevelRequirement = _selectedMission.LevelRequirement,
+                    RequiredAttributes = EffectiveRequiredAttributes ?? _selectedMission.RequiredAttributes,
+                    IsFlagged = _selectedMission.IsFlagged,
+                    IsPriority = _selectedMission.IsPriority
+                };
+                _results = _optimizer.Optimize(_members, effectiveMission, maxTrainingPoints, _currentTraining, _trainingCourses);
             }
             ImGui.SameLine();
             if (ImGui.Button(Loc.T("ResetBtn"), new Vector2(ImGui.GetContentRegionAvail().X, 40)))
@@ -318,9 +412,9 @@ namespace KaySquadron
                         // Compare final stats to required stats
                         ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), Loc.T("StatsFinalVsRequired"));
                         
-                        DrawStatComparison(Loc.T("Physical"), res.FinalStats.Physical, _selectedMission.RequiredAttributes.Physical, new Vector4(0.01f, 0.95f, 1f, 1f));
-                        DrawStatComparison(Loc.T("Mental"), res.FinalStats.Mental, _selectedMission.RequiredAttributes.Mental, new Vector4(0.1f, 0.7f, 0.9f, 1f));
-                        DrawStatComparison(Loc.T("Tactical"), res.FinalStats.Tactical, _selectedMission.RequiredAttributes.Tactical, new Vector4(0.3f, 1f, 0.8f, 1f));
+                        DrawStatComparison(Loc.T("Physical"), res.FinalStats.Physical, (EffectiveRequiredAttributes ?? _selectedMission.RequiredAttributes).Physical, new Vector4(0.01f, 0.95f, 1f, 1f));
+                        DrawStatComparison(Loc.T("Mental"), res.FinalStats.Mental, (EffectiveRequiredAttributes ?? _selectedMission.RequiredAttributes).Mental, new Vector4(0.1f, 0.7f, 0.9f, 1f));
+                        DrawStatComparison(Loc.T("Tactical"), res.FinalStats.Tactical, (EffectiveRequiredAttributes ?? _selectedMission.RequiredAttributes).Tactical, new Vector4(0.3f, 1f, 0.8f, 1f));
 
                         ImGui.Unindent();
                         ImGui.Spacing();
