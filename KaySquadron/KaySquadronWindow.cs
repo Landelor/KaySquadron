@@ -216,17 +216,21 @@ namespace KaySquadron
         /// Squadron Missions window's own "Required Attributes" display, instead of guessing
         /// which of GcArmyExpedition's 6 ExpeditionParams slots is active. Necessary because
         /// that selection has proven NOT to follow any static formula we could find (constant
-        /// slot, then slot-by-mission-type - both disproven against different real missions);
+        /// slot, then slot-by-mission-type, both disproven against different real missions);
         /// the live display is the one thing guaranteed to always be correct, since it's
         /// whatever the game itself is showing the player.
         ///
-        /// Best-effort and read-only: finds every Text node inside RequiredAttributesComponentNode,
-        /// keeps ones that parse as a plain positive number, and orders them top-to-bottom by
-        /// screen Y position (the convention used everywhere else in this UI is Physical/
-        /// Mental/Tactical, top to bottom). Returns null (falling back to the sheet guess) if
-        /// the addon isn't open, the component is missing, or anything other than exactly 3
-        /// numeric labels is found - this is intentionally conservative, since a wrong guess
-        /// here would be worse than silently falling back to the existing sheet-based value.
+        /// Best-effort and read-only: recursively walks every node under
+        /// RequiredAttributesComponentNode (including nested sub-components, since the
+        /// numbers may not be direct children), collecting every Text node whose content is
+        /// purely digits. Multi-digit numbers are sometimes split across several adjacent text
+        /// nodes rather than stored as one string, so nodes are first clustered into rows by
+        /// screen Y (within a small tolerance) and then concatenated left-to-right by screen X
+        /// within each row before parsing - this reconstructs the full number regardless of how
+        /// many fragments it's split into. Returns null (falling back to the sheet guess) if the
+        /// addon isn't open, the component is missing, or anything other than exactly 3 rows
+        /// parse as a number - intentionally conservative, since a wrong guess here would be
+        /// worse than silently falling back to the existing sheet-based value.
         /// </summary>
         private unsafe Attributes? TryReadLiveRequiredAttributes()
         {
@@ -240,34 +244,88 @@ namespace KaySquadron
                 var component = addon->RequiredAttributesComponentNode;
                 if (component == null) return null;
 
-                var candidates = new List<(float ScreenY, int Value)>();
-                foreach (var nodePtr in component->UldManager.Nodes)
-                {
-                    var node = nodePtr.Value;
-                    if (node == null || node->Type != FFXIVClientStructs.FFXIV.Component.GUI.NodeType.Text) continue;
+                var fragments = new List<(float ScreenX, float ScreenY, string Digits)>();
+                CollectNumericTextFragments(component, fragments);
 
-                    var textNode = (FFXIVClientStructs.FFXIV.Component.GUI.AtkTextNode*)node;
-                    string text = textNode->NodeText.ToString();
-                    string digits = new string(text.Where(char.IsDigit).ToArray());
-                    if (digits.Length > 0 && int.TryParse(digits, out int value) && value > 0)
-                    {
-                        candidates.Add((node->ScreenY, value));
-                    }
-                }
-
-                if (candidates.Count != 3)
+                if (fragments.Count == 0)
                 {
-                    AddDebug($"Live requirement read: expected 3 numeric labels, found {candidates.Count} - falling back to sheet guess.");
+                    AddDebug("Live requirement read: found no numeric text fragments at all - falling back to sheet guess.");
                     return null;
                 }
 
-                var ordered = candidates.OrderBy(c => c.ScreenY).Select(c => c.Value).ToList();
-                return new Attributes(ordered[0], ordered[1], ordered[2]);
+                // Cluster fragments into rows by screen Y (within ~6px), then within each row
+                // order left-to-right by screen X and concatenate - handles both "one node per
+                // full number" and "one node per digit" layouts identically.
+                const float rowTolerance = 6f;
+                var clustered = new List<(float Y, List<(float X, string Digits)> Parts)>();
+                foreach (var frag in fragments.OrderBy(f => f.ScreenY))
+                {
+                    var existing = clustered.FirstOrDefault(c => Math.Abs(c.Y - frag.ScreenY) <= rowTolerance);
+                    if (existing.Parts != null)
+                    {
+                        existing.Parts.Add((frag.ScreenX, frag.Digits));
+                    }
+                    else
+                    {
+                        clustered.Add((frag.ScreenY, new List<(float X, string Digits)> { (frag.ScreenX, frag.Digits) }));
+                    }
+                }
+
+                var values = new List<int>();
+                foreach (var row in clustered.OrderBy(c => c.Y))
+                {
+                    string combined = string.Concat(row.Parts.OrderBy(p => p.X).Select(p => p.Digits));
+                    if (int.TryParse(combined, out int value) && value > 0)
+                    {
+                        values.Add(value);
+                    }
+                }
+
+                if (values.Count != 3)
+                {
+                    AddDebug($"Live requirement read: expected 3 numeric rows, found {values.Count} ({string.Join(",", values)}) - falling back to sheet guess.");
+                    return null;
+                }
+
+                return new Attributes(values[0], values[1], values[2]);
             }
             catch (Exception ex)
             {
                 Plugin.Log.Error($"Live requirement read failed: {ex}");
                 return null;
+            }
+        }
+
+        /// <summary>Recursively collects every Text node's digit-only content (screen X/Y plus
+        /// the digit string) found anywhere under the given component, including nested
+        /// sub-components. Non-numeric or empty text nodes are skipped.</summary>
+        private static unsafe void CollectNumericTextFragments(
+            FFXIVClientStructs.FFXIV.Component.GUI.AtkComponentBase* component,
+            List<(float ScreenX, float ScreenY, string Digits)> results)
+        {
+            foreach (var nodePtr in component->UldManager.Nodes)
+            {
+                var node = nodePtr.Value;
+                if (node == null) continue;
+
+                if (node->Type == FFXIVClientStructs.FFXIV.Component.GUI.NodeType.Text)
+                {
+                    var textNode = (FFXIVClientStructs.FFXIV.Component.GUI.AtkTextNode*)node;
+                    string text = textNode->NodeText.ToString();
+                    string digits = new string(text.Where(char.IsDigit).ToArray());
+                    if (digits.Length > 0)
+                    {
+                        results.Add((node->ScreenX, node->ScreenY, digits));
+                    }
+                }
+                else if (node->GetNodeType() == FFXIVClientStructs.FFXIV.Component.GUI.NodeType.Component)
+                {
+                    var componentNode = (FFXIVClientStructs.FFXIV.Component.GUI.AtkComponentNode*)node;
+                    if (componentNode->Component != null)
+                    {
+                        CollectNumericTextFragments(componentNode->Component, results);
+                    }
+                }
             }
         }
 
