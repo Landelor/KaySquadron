@@ -22,6 +22,7 @@ namespace KaySquadron
         private Optimizer _optimizer = new();
         private Attributes _currentTraining = new(0, 0, 0);
         private Attributes? _liveRequiredAttributesOverride;
+        private string _lastLiveReadDiagnostic = "not attempted yet";
         private readonly Configuration _configuration;
         private int _lastSyncedMissionRow = -1;
 
@@ -237,19 +238,31 @@ namespace KaySquadron
             try
             {
                 var addonPtr = Plugin.GameGui.GetAddonByName("GcArmyExpedition");
-                if (addonPtr.Address == 0) return null;
+                if (addonPtr.Address == 0)
+                {
+                    _lastLiveReadDiagnostic = "addon not found (GcArmyExpedition not open)";
+                    return null;
+                }
                 var addon = (FFXIVClientStructs.FFXIV.Client.UI.AddonGcArmyExpedition*)addonPtr.Address;
-                if (addon == null) return null;
+                if (addon == null)
+                {
+                    _lastLiveReadDiagnostic = "addon pointer was null after cast";
+                    return null;
+                }
 
                 var component = addon->RequiredAttributesComponentNode;
-                if (component == null) return null;
+                if (component == null)
+                {
+                    _lastLiveReadDiagnostic = "RequiredAttributesComponentNode is null";
+                    return null;
+                }
 
                 var fragments = new List<(float ScreenX, float ScreenY, string Digits)>();
                 CollectNumericTextFragments(component, fragments);
 
                 if (fragments.Count == 0)
                 {
-                    AddDebug("Live requirement read: found no numeric text fragments at all - falling back to sheet guess.");
+                    _lastLiveReadDiagnostic = "component found, but 0 numeric text fragments anywhere under it";
                     return null;
                 }
 
@@ -272,9 +285,11 @@ namespace KaySquadron
                 }
 
                 var values = new List<int>();
+                var rowSummaries = new List<string>();
                 foreach (var row in clustered.OrderBy(c => c.Y))
                 {
                     string combined = string.Concat(row.Parts.OrderBy(p => p.X).Select(p => p.Digits));
+                    rowSummaries.Add($"y={row.Y:F0}:'{combined}'(parts={row.Parts.Count})");
                     if (int.TryParse(combined, out int value) && value > 0)
                     {
                         values.Add(value);
@@ -283,14 +298,17 @@ namespace KaySquadron
 
                 if (values.Count != 3)
                 {
-                    AddDebug($"Live requirement read: expected 3 numeric rows, found {values.Count} ({string.Join(",", values)}) - falling back to sheet guess.");
+                    _lastLiveReadDiagnostic = $"found {fragments.Count} fragments -> {clustered.Count} rows: [{string.Join(" | ", rowSummaries)}] - need exactly 3 valid rows";
+                    AddDebug($"Live requirement read: {_lastLiveReadDiagnostic}");
                     return null;
                 }
 
+                _lastLiveReadDiagnostic = $"OK: {values[0]}/{values[1]}/{values[2]}";
                 return new Attributes(values[0], values[1], values[2]);
             }
             catch (Exception ex)
             {
+                _lastLiveReadDiagnostic = $"exception: {ex.Message}";
                 Plugin.Log.Error($"Live requirement read failed: {ex}");
                 return null;
             }
@@ -364,6 +382,7 @@ namespace KaySquadron
                     $" 💪 {required.Physical}   🧠 {required.Mental}   🎯 {required.Tactical}");
                 ImGui.SameLine();
                 ImGui.TextColored(sourceColor, $"({source})");
+                ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), $" live-read diagnostic: {_lastLiveReadDiagnostic}");
             }
 
             ImGui.Spacing();
