@@ -266,30 +266,38 @@ namespace KaySquadron
                     return null;
                 }
 
-                // Cluster fragments into rows by screen Y (within ~6px), then within each row
-                // order left-to-right by screen X and concatenate - handles both "one node per
-                // full number" and "one node per digit" layouts identically.
+                // Group fragments into one number per "reading position": consecutive fragments
+                // (in top-to-bottom, left-to-right order) are merged into the SAME number only
+                // if they're on the same row (Y within tolerance) AND close together on X (within
+                // mergeGapThreshold) - that handles a number split across adjacent digit nodes.
+                // Fragments on the same row but far apart on X (confirmed live: Physical/Mental/
+                // Tactical are laid out side-by-side in one row, each already a complete number,
+                // separated by icon+padding) are correctly kept as SEPARATE values instead.
                 const float rowTolerance = 6f;
-                var clustered = new List<(float Y, List<(float X, string Digits)> Parts)>();
-                foreach (var frag in fragments.OrderBy(f => f.ScreenY))
+                const float mergeGapThreshold = 20f;
+                var groups = new List<List<(float X, float Y, string Digits)>>();
+                foreach (var frag in fragments.OrderBy(f => f.ScreenY).ThenBy(f => f.ScreenX))
                 {
-                    var existing = clustered.FirstOrDefault(c => Math.Abs(c.Y - frag.ScreenY) <= rowTolerance);
-                    if (existing.Parts != null)
+                    if (groups.Count > 0)
                     {
-                        existing.Parts.Add((frag.ScreenX, frag.Digits));
+                        var last = groups[^1][^1];
+                        bool sameRow = Math.Abs(last.Y - frag.ScreenY) <= rowTolerance;
+                        bool adjacentX = Math.Abs(frag.ScreenX - last.X) <= mergeGapThreshold;
+                        if (sameRow && adjacentX)
+                        {
+                            groups[^1].Add((frag.ScreenX, frag.ScreenY, frag.Digits));
+                            continue;
+                        }
                     }
-                    else
-                    {
-                        clustered.Add((frag.ScreenY, new List<(float X, string Digits)> { (frag.ScreenX, frag.Digits) }));
-                    }
+                    groups.Add(new List<(float X, float Y, string Digits)> { (frag.ScreenX, frag.ScreenY, frag.Digits) });
                 }
 
                 var values = new List<int>();
                 var rowSummaries = new List<string>();
-                foreach (var row in clustered.OrderBy(c => c.Y))
+                foreach (var group in groups)
                 {
-                    string combined = string.Concat(row.Parts.OrderBy(p => p.X).Select(p => p.Digits));
-                    rowSummaries.Add($"y={row.Y:F0}:'{combined}'(parts={row.Parts.Count})");
+                    string combined = string.Concat(group.Select(g => g.Digits));
+                    rowSummaries.Add($"y={group[0].Y:F0},x={group[0].X:F0}:'{combined}'(parts={group.Count})");
                     if (int.TryParse(combined, out int value) && value > 0)
                     {
                         values.Add(value);
@@ -298,7 +306,7 @@ namespace KaySquadron
 
                 if (values.Count != 3)
                 {
-                    _lastLiveReadDiagnostic = $"found {fragments.Count} fragments -> {clustered.Count} rows: [{string.Join(" | ", rowSummaries)}] - need exactly 3 valid rows";
+                    _lastLiveReadDiagnostic = $"found {fragments.Count} fragments -> {groups.Count} groups: [{string.Join(" | ", rowSummaries)}] - need exactly 3 valid groups";
                     AddDebug($"Live requirement read: {_lastLiveReadDiagnostic}");
                     return null;
                 }
